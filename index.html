@@ -564,7 +564,7 @@ function ensureMap(){
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
   layer=L.layerGroup().addTo(map);
   map.on('dragstart',()=>{if(followMe){followMe=false;meBtn();}});
-  map.on('click',e=>{if(!moveKey)return;const h=S.houses[moveKey]||(S.houses[moveKey]={});h.pos=[+e.latlng.lat.toFixed(6),+e.latlng.lng.toFixed(6)];moveKey=null;save();banner();drawMap();toast('Nålen är flyttad');});
+  map.on('click',e=>{if(!moveKey)return;const mk=moveKey,h=S.houses[mk]||(S.houses[mk]={});h.pos=[+e.latlng.lat.toFixed(6),+e.latlng.lng.toFixed(6)];h.posPending=true;moveKey=null;save();pushPlaces({[mk]:{lat:h.pos[0],lon:h.pos[1],manual:true}});banner();drawMap();toast('Nålen är flyttad');});
   startGPS();
   return true;}
 function pinState(it,isNext){const st=status(it);if(st==='klar')return 'done';if(st==='ejin')return 'ejin';if(S.week.closed)return 'skip';if(isNext)return 'next';if(skipReason(it))return 'skip';if(checkDue(it))return 'check';return 'todo';}
@@ -598,7 +598,7 @@ function panToNext(){if(followMe&&lastMe){focusMe();return;}const n=nextItem();i
 let bannerHidden=false;
 function banner(){const b=$('#mapBanner');let t='';
   if(moveKey)t='Tryck på kartan där <b>'+esc(byKey(moveKey)?.address||'')+'</b> ligger. <a href="#" data-act="movecancel">Avbryt</a>';
-  else if(geoBusy)t=`Hittar adresserna på kartan… ${geoBusy.done} av ${geoBusy.total}`;
+  else if(geoBusy)t=geoBusy.loading?'Hämtar kartplatser…':`Hittar adresserna på kartan… ${geoBusy.done} av ${geoBusy.total}`;
   else if(S.route){const miss=items().filter(i=>!posOf(i)),un=items().filter(isUnsure);
     if(miss.length)t=`${miss.length} ${miss.length===1?'adress':'adresser'} hittades inte. Öppna dem i Rutt → <i>Flytta nålen på kartan</i>.`;
     else if(un.length)t=`${un.map(i=>'nr '+nrOf(i)).join(', ')}: osäker plats, placerad mellan grannarna i rutten. Tryck på nålen → <i>Flytta nålen</i> om den är fel. <a href="#" data-act="bannerok">OK</a>`;}
@@ -642,27 +642,51 @@ async function nominatim(params){
   const u='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=se&'+new URLSearchParams(params);
   const r=await fetch(u,{headers:{'Accept-Language':'sv'}});if(!r.ok)throw new Error('HTTP '+r.status);
   const j=await r.json();return j[0]?[+(+j[0].lat).toFixed(6),+(+j[0].lon).toFixed(6)]:null;}
+// Söker på gata + nummer (utan uppgångsbokstav), så att t.ex. Kungsgatan 35 A–D bara kostar en sökning.
 async function geocodeOne(addr){
   const m=addr.match(/^(.*?)\s+(\d+)\s*([A-Za-zÅÄÖåäö])?$/);
-  const street=m?m[1]:addr,num=m?m[2]:'',let_=m&&m[3]?m[3]:'';
+  const street=m?m[1]:addr,num=m?m[2]:'';
   const tries=[];
-  if(let_)tries.push({street:`${num}${let_} ${street}`,city:S.city});
   if(num)tries.push({street:`${num} ${street}`,city:S.city});
-  tries.push({q:`${addr}, ${S.city}`});
+  tries.push({q:`${num?street+' '+num:addr}, ${S.city}`});
   for(const t of tries){const k='q:'+JSON.stringify(t);
     if(k in S.geo){if(S.geo[k])return S.geo[k];continue;}
     let res=null;try{res=await nominatim(t);}catch(e){await sleep(1100);return undefined;} // nätverksfel: försök senare
     S.geo[k]=res;await sleep(1100);if(res)return res;}
   return null;}
+
+// ---------- delade kartplatser via kalkylarket ----------
+async function pushPlaces(places){
+  if(!S.pin||!Object.keys(places).length)return;
+  try{const j=await fetch(syncURL(),{method:'POST',body:JSON.stringify({action:'places',pin:S.pin,places}),redirect:'follow'}).then(x=>x.json());
+    if(j.ok){for(const k of Object.keys(places))if(S.houses[k])delete S.houses[k].posPending;save();}}catch(e){}}
+// Hämtar platser som andra telefoner redan hittat (och handplacerade nålar), och delar med sig av sina egna.
+async function syncPlaces(){
+  if(!S.pin||!S.route)return;
+  let remote={};
+  try{const j=await fetch(syncURL()+'?action=places&pin='+encodeURIComponent(S.pin),{redirect:'follow'}).then(x=>x.json());if(!j.ok)return;remote=j.places||{};}catch(e){return;}
+  const share={};
+  for(const it of items()){const k=keyOf(it.address),gk=geoKey(it.address),r=remote[k],h=S.houses[k]||(S.houses[k]={});
+    if(r&&r[2]){if(!h.posPending)h.pos=[r[0],r[1]];}
+    else if(r&&!S.geo[gk])S.geo[gk]=[r[0],r[1]];
+    if(h.pos&&(h.posPending||!(r&&r[2]&&r[0]===h.pos[0]&&r[1]===h.pos[1])))share[k]={lat:h.pos[0],lon:h.pos[1],manual:true};
+    else if(!r&&S.geo[gk])share[k]={lat:S.geo[gk][0],lon:S.geo[gk][1],manual:false};}
+  save();if(tab==='map')drawMap();
+  pushPlaces(share);}
 async function geocodeAll(force){
   if(geoBusy||!S.route)return;
+  geoBusy={done:0,total:0,loading:true};banner();
+  if(!force)await syncPlaces();
   const todo=items().filter(i=>force||!(geoKey(i.address) in S.geo));
-  if(!todo.length){S.geoDone=true;return;}
+  if(!todo.length){geoBusy=null;S.geoDone=true;save();if(tab==='map')drawMap();else banner();return;}
   geoBusy={done:0,total:todo.length};banner();
-  for(const it of todo){const r=await geocodeOne(it.address);if(r!==undefined)S.geo[geoKey(it.address)]=r;geoBusy.done++;save();if(tab==='map')drawMap();else banner();}
+  const found={};
+  for(const it of todo){const r=await geocodeOne(it.address);
+    if(r!==undefined){S.geo[geoKey(it.address)]=r;if(r)found[keyOf(it.address)]={lat:r[0],lon:r[1],manual:false};}
+    geoBusy.done++;save();if(tab==='map')drawMap();else banner();}
   geoBusy=null;S.geoDone=true;save();fitted=false;render();
+  pushPlaces(found);
   const miss=items().filter(i=>!posOf(i)).length;toast(miss?`${miss} ${miss===1?'adress':'adresser'} hittades inte på kartan`:'Alla adresser finns på kartan');}
-
 // ======================= KALKYLARK =======================
 // Inbyggd koppling. Den här länken får bara skriva rader och testa kopplingen – att läsa tillbaka rapporterna kräver PIN-koden.
 const DEFAULT_SYNC='https://script.google.com/macros/s/AKfycby-399HqXr18u8-Zcz8Xk4L3oDd9FweXlT6sIsWhu5ucaT_XneTuTEXK068Da66FI7B/exec';

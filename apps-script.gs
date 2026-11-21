@@ -8,6 +8,7 @@
  * Kopiera webbappens länk (slutar på /exec) och klistra in den i appen under Lista → Kalkylark.
  *
  * Fliken "Rapporter" skapas automatiskt: en rad per hus och vecka.
+ * Lägg till skriptegenskapen PIN (Projektinställningar → Skriptegenskaper) för att kunna hämta rapporterna till en ny telefon.
  */
 
 const FLIK = 'Rapporter';
@@ -72,11 +73,18 @@ function doPost(e) {
   }
 }
 
-/** Appen hämtar raderna härifrån (för att testa kopplingen eller återställa på en ny telefon). */
+/**
+ * Appen hämtar raderna härifrån (för att återställa på en ny telefon). Kräver PIN-koden som
+ * sparas under Projektinställningar → Skriptegenskaper → PIN. Utan rätt PIN lämnas inget ut.
+ * ?ping=1 svarar bara med antalet rader (för att testa kopplingen).
+ */
 function doGet(e) {
+  const p = (e && e.parameter) || {};
   const sh = flik_();
   const sista = sh.getLastRow();
-  if (e && e.parameter && e.parameter.ping) return svar_({ ok: true, rows: Math.max(0, sista - 1) });
+  if (p.ping) return svar_({ ok: true, rows: Math.max(0, sista - 1) });
+  const pin = PropertiesService.getScriptProperties().getProperty('PIN');
+  if (!pin || String(p.pin || '') !== String(pin)) return svar_({ ok: false, error: 'PIN' });
   if (sista < 2) return svar_({ ok: true, rows: [] });
   const v = sh.getRange(2, 1, sista - 1, KOLUMNER.length).getValues();
   const rader = v.map(r => ({

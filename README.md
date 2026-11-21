@@ -25,7 +25,8 @@ All data sparas i telefonens webbläsare (säkerhetskopia finns under Lista) och
 1. Öppna kalkylarket → **Tillägg → Apps Script**.
 2. Ta bort koden som står där och klistra in hela `apps-script.gs`. Spara.
 3. **Implementera → Ny implementering → Webbapp**. Kör som: *Jag*. Vem har åtkomst: *Alla*. Implementera och godkänn behörigheterna.
-4. Kopiera webbappens länk (slutar på `/exec`) och klistra in den i appen under **Lista → Kalkylark**.
+4. Lägg in webbappens länk (slutar på `/exec`) som `DEFAULT_SYNC` i `index.html` – då är appen kopplad från början.
+5. Lägg till skriptegenskapen **PIN** (Projektinställningar → Skriptegenskaper). Den krävs för att hämta tillbaka rapporterna till en ny telefon och står inte i koden.
 
 Fliken *Rapporter* skapas automatiskt med en rad per hus och vecka. Portkoder skickas aldrig. Ändras skriptet senare: **Implementera → Hantera implementeringar → redigera → Ny version**.
 

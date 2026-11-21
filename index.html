@@ -181,6 +181,7 @@ body{padding-top:calc(env(safe-area-inset-top) + 2px)}
 .problist{display:flex;flex-direction:column;gap:8px;margin-top:6px}
 .problist .btn{padding:14px;font-size:17px}
 .dbtns .btn.warn{font-size:15px}
+#btnMe.on{background:#1a73e8;color:#fff;border-color:#1a73e8}
 </style>
 </head>
 <body>
@@ -362,7 +363,7 @@ function render(){
   else if(tab==='map')v.innerHTML='';
   else if(tab==='report')v.innerHTML=reportHTML();
   else v.innerHTML=setupHTML();
-  dock(main?nextItem():null);
+  dock(main?nextItem():null);updateMeLine();
   if(showMap){sizeMap();drawMap();}
   if(sheetKey)refreshSheet();
   syncUI();
@@ -482,7 +483,7 @@ function closeModal(){sheetKey=null;$('#modal').classList.remove('open');documen
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 
 // ======================= KARTA =======================
-let map=null,layer=null,me=null,meAcc=null,watchId=null,fitted=false,moveKey=null,lastMe=null;
+let map=null,layer=null,me=null,meAcc=null,watchId=null,fitted=false,moveKey=null,lastMe=null,meLine=null,followMe=false,autoFollowed=false;
 function rawPos(it){const h=hOf(it);if(h.pos)return {p:h.pos,manual:true};const g=S.geo[geoKey(it.address)];return g?{p:g}:null;}
 function dist(a,b){const r=Math.PI/180,dy=(b[0]-a[0])*r,dx=(b[1]-a[1])*r*Math.cos(a[0]*r);return 6371000*Math.hypot(dx,dy);}
 // Adressökningen kan placera ett hus fel (t.ex. på fel del av gatan). Ett hus som ligger långt från
@@ -516,6 +517,7 @@ function ensureMap(){
   map=L.map('map',{zoomControl:false}).setView([58.4108,15.6214],15);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
   layer=L.layerGroup().addTo(map);
+  map.on('dragstart',()=>{if(followMe){followMe=false;meBtn();}});
   map.on('click',e=>{if(!moveKey)return;const h=S.houses[moveKey]||(S.houses[moveKey]={});h.pos=[+e.latlng.lat.toFixed(6),+e.latlng.lng.toFixed(6)];moveKey=null;save();banner();drawMap();toast('Nålen är flyttad');});
   startGPS();
   return true;}
@@ -534,11 +536,19 @@ function drawMap(){
     mk.on('click',()=>{if(moveKey)return;openHouse(keyOf(it.address));});
     pts.push(p);
     if(!status(it)&&!skipReason(it))route.push(p);});
-  if(nx&&posOf(nx)&&lastMe)route.unshift(lastMe);
   if(route.length>1)L.polyline(route,{color:'#1f5f4a',weight:4,opacity:.75,dashArray:'6 8',interactive:false}).addTo(layer);
-  if(!fitted&&pts.length){map.fitBounds(pts,{padding:[30,30]});fitted=true;}
-  banner();}
-function panToNext(){const n=nextItem();if(n&&map&&posOf(n))map.panTo(posOf(n),{animate:true});}
+  if(!fitted&&pts.length&&!followMe){map.fitBounds(pts,{padding:[30,30]});fitted=true;}
+  updateMeLine();banner();}
+// Blå linje från min position till nästa hus, och följ-läge.
+function updateMeLine(){
+  const n=nextItem(),p=n&&posOf(n);
+  if(!map||!lastMe||!p){if(meLine){meLine.remove();meLine=null;}return;}
+  if(!meLine)meLine=L.polyline([lastMe,p],{color:'#1a73e8',weight:5,opacity:.85,interactive:false}).addTo(map);
+  else meLine.setLatLngs([lastMe,p]);}
+function focusMe(animate){if(!map||!lastMe)return;const n=nextItem(),p=n&&posOf(n);
+  if(p)map.fitBounds([lastMe,p],{padding:[70,70],maxZoom:18,animate:animate!==false});else map.setView(lastMe,18,{animate:animate!==false});}
+function meBtn(){$('#btnMe').classList.toggle('on',followMe);}
+function panToNext(){if(followMe&&lastMe){focusMe();return;}const n=nextItem();if(n&&map&&posOf(n))map.panTo(posOf(n),{animate:true});}
 let bannerHidden=false;
 function banner(){const b=$('#mapBanner');let t='';
   if(moveKey)t='Tryck på kartan där <b>'+esc(byKey(moveKey)?.address||'')+'</b> ligger. <a href="#" data-act="movecancel">Avbryt</a>';
@@ -555,8 +565,11 @@ function startGPS(){
     if(!me){me=L.marker(lastMe,{icon:L.divIcon({className:'',html:'<div class="me-dot"></div>',iconSize:[16,16],iconAnchor:[8,8]}),zIndexOffset:2000,interactive:false}).addTo(map);
       meAcc=L.circle(lastMe,{radius:p.coords.accuracy,color:'#1a73e8',weight:1,fillOpacity:.08,interactive:false}).addTo(map);}
     else{me.setLatLng(lastMe);meAcc.setLatLng(lastMe).setRadius(p.coords.accuracy);}
+    updateMeLine();
+    if(!autoFollowed){autoFollowed=true;const n=nextItem(),q=n&&posOf(n);if(q&&dist(lastMe,q)<2000){followMe=true;meBtn();focusMe(false);}}
+    else if(followMe&&tab==='map'&&!sheetKey&&!$('#modal').classList.contains('open'))focusMe();
   },err=>{if(err.code===1)toast('Tillåt platsåtkomst i Safari för att se din position');},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});}
-$('#btnMe').addEventListener('click',()=>{if(lastMe&&map)map.setView(lastMe,18);else{startGPS();toast('Söker din position…');}});
+$('#btnMe').addEventListener('click',()=>{followMe=true;meBtn();if(lastMe&&map){focusMe();toast('Följer din position');}else{startGPS();toast('Söker din position…');}});
 $('#btnFit').addEventListener('click',()=>{if(!map)return;const pts=items().map(posOf).filter(Boolean);if(pts.length)map.fitBounds(pts,{padding:[30,30]});});
 
 function reportText(){

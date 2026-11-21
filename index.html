@@ -325,10 +325,23 @@ function skipReason(it){
   if(h.access&&!h.newCode)return 'Kom inte in: '+PROBLEMS[h.access].toLowerCase();
   return null;}
 const active=()=>items().filter(i=>S.showAll||!skipReason(i));
-const nextItem=()=>S.week.closed?undefined:active().find(i=>!status(i));
+// Gångriktning: 1 = som i listan, -1 = baklänges (börjar på sista adressen).
+const orderedActive=()=>S.week.dir===-1?active().reverse():active();
+// Nästa hus: fortsätt efter det senast markerade huset i gångriktningen, annars första obesökta.
+function nextItem(){if(S.week.closed)return undefined;const a=orderedActive();
+  const li=S.week.last?a.findIndex(i=>keyOf(i.address)===S.week.last):-1;
+  for(let j=li+1;j<a.length;j++)if(!status(a[j]))return a[j];
+  return a.find(i=>!status(i));}
+// Välj riktning efter var man står när veckan inte är påbörjad.
+function autoDir(){
+  if(!S.route||!lastMe||S.week.dir!=null||Object.keys(S.week.done).length)return;
+  const a=active().filter(posOf);if(a.length<2)return;
+  const dF=dist(lastMe,posOf(a[0])),dL=dist(lastMe,posOf(a[a.length-1]));
+  S.week.dir=dL+50<dF?-1:1;save();render();
+  if(S.week.dir===-1)toast('Rutten är vänd – du börjar vid '+a[a.length-1].address+' (närmast dig)');}
 const notVisited=()=>S.week.closed?active().filter(i=>!status(i)):[];
 function setVill(it,v){const h=H(it);v=Math.max(0,Math.min(it.hh,v));if(v===0&&h.vill!==0)h.zeroSince=S.week.no;if(v===0&&checkDue(it))h.zeroSince=S.week.no;h.vill=v;delete h.hhChanged;}
-function markDone(it){const k=keyOf(it.address),h=H(it);S.week.done[k]='klar';delete h.access;delete h.newCode;delete h.hhChanged;if(h.vill===0)h.zeroSince=S.week.no;}
+function markDone(it){const k=keyOf(it.address),h=H(it);S.week.done[k]='klar';S.week.last=k;delete h.access;delete h.newCode;delete h.hhChanged;if(h.vill===0)h.zeroSince=S.week.no;}
 const mapsURL=it=>{const p=posOf(it);return p?`https://maps.apple.com/?daddr=${p[0]},${p[1]}&dirflg=w`:'https://maps.apple.com/?daddr='+encodeURIComponent(it.address+', '+S.city)+'&dirflg=w';};
 
 // ---------- gemensamma bitar ----------
@@ -399,7 +412,7 @@ function routeHTML(all,act){
   const nx=nextItem(),remaining=act.filter(i=>!status(i));
   let h='';
   if(!act.length)h+=`<div class="empty"><p>Alla adresser hoppas över. Slå av Smart rutt i menyn för att se dem.</p></div>`;
-  h+=act.map(i=>cardHTML(i,nx&&i===nx)).join('');
+  h+=(S.week.dir===-1?act.slice().reverse():act).map(i=>cardHTML(i,nx&&i===nx)).join('');
   if(!S.showAll){const sk=all.filter(skipReason);
     if(sk.length)h+=`<details class="skipped"><summary>Hoppas över (${sk.length})</summary>${sk.map(i=>`<div class="skip-item"><div><b>${esc(i.address)}</b><div class="muted">${esc(skipReason(i))}</div></div><button class="btn small" data-act="unskip" data-k="${esc(keyOf(i.address))}">Ta med</button></div>`).join('')}</details>`;}
   if(S.week.closed)h=`<div class="note">Utdelningen är avslutad${remaining.length?` – ${remaining.length} ej besökta`:''}. <a href="#" data-act="reopen">Öppna igen</a></div>`+h;
@@ -495,6 +508,7 @@ function menuHTML(){return `<div class="grab"></div><div class="sheet-head"><div
   <label class="menuitem file"><span>⬆︎</span><div><b>Lägg upp ny lista</b><div class="muted">Välj PDF:en – den sparas i Drive så att alla ser den</div></div><input type="file" accept="application/pdf,.pdf" data-upload></label>
   ${S.route&&!S.week.closed?`<button class="menuitem" data-act="closeweek"><span>🏁</span><div><b>Avsluta utdelningen</b><div class="muted">När du är klar – även om alla adresser inte är besökta</div></div></button>`:''}
   ${S.route&&S.week.closed?`<button class="menuitem" data-act="reopen"><span>↩︎</span><div><b>Öppna utdelningen igen</b><div class="muted">Den här veckan är avslutad</div></div></button>`:''}
+  ${S.route&&!S.week.closed?`<button class="menuitem" data-act="reverse"><span>⇅</span><div><b>Vänd rutten</b><div class="muted">Gå ${S.week.dir===-1?'i listans ordning igen':'från sista adressen mot första'}</div></div></button>`:''}
   <button class="menuitem" data-go="report"><span>📋</span><div><b>Rapport till arbetsgivaren</b><div class="muted">Kodproblem och hur många som vill ha reklam</div></div></button>
   <button class="menuitem" data-go="setup"><span>⚙︎</span><div><b>Inställningar</b><div class="muted">Kalkylark, smart rutt, säkerhetskopia</div></div></button>`;}
 
@@ -586,7 +600,7 @@ function startGPS(){
     if(!me){me=L.marker(lastMe,{icon:L.divIcon({className:'',html:'<div class="me-dot"></div>',iconSize:[16,16],iconAnchor:[8,8]}),zIndexOffset:2000,interactive:false}).addTo(map);
       meAcc=L.circle(lastMe,{radius:p.coords.accuracy,color:'#1a73e8',weight:1,fillOpacity:.08,interactive:false}).addTo(map);}
     else{me.setLatLng(lastMe);meAcc.setLatLng(lastMe).setRadius(p.coords.accuracy);}
-    updateMeLine();
+    updateMeLine();autoDir();
     if(!autoFollowed){autoFollowed=true;const n=nextItem(),q=n&&posOf(n);if(q&&dist(lastMe,q)<2000){followMe=true;meBtn();focusMe(false);}}
     else if(followMe&&tab==='map'&&!sheetKey&&!$('#modal').classList.contains('open'))focusMe();
   },err=>{if(err.code===1)toast('Tillåt platsåtkomst i Safari för att se din position');},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});}
@@ -712,7 +726,7 @@ function periodNo(p){const s=String(p||'');return /^\d{5}$/.test(s)?(+s.slice(0,
 const MONTHS={jan:0,feb:1,mar:2,apr:3,maj:4,jun:5,jul:6,aug:7,sep:8,okt:9,nov:10,dec:11};
 function listDate(meta){const m=String(meta&&meta.date||'').match(/(\d{1,2})\.\s*([a-zåäö]{3})[a-zåäö]*\.?\s*(\d{4})/i);
   return m&&MONTHS[m[2].toLowerCase()]!=null?new Date(+m[3],MONTHS[m[2].toLowerCase()],+m[1]):null;}
-function storeCurrent(){if(S.route&&S.week.period){S.lists[S.week.period]=S.route;S.weeks[S.week.period]={no:S.week.no,done:S.week.done,closed:S.week.closed||null};}}
+function storeCurrent(){if(S.route&&S.week.period){S.lists[S.week.period]=S.route;const w=Object.assign({},S.week);delete w.period;S.weeks[S.week.period]=w;}}
 // Lägger in en tolkad lista och öppnar den.
 function addList(r,fileId){
   const per=String(r.meta.period);
@@ -731,10 +745,10 @@ function openList(per){
       if(h.hh!=null&&h.hh!==it.hh){h.hhChanged=true;hhN++;}
       h.snap=snap;h.hh=it.hh;if(h.zeroSince==null&&h.vill===0)h.zeroSince=no;}
     S.snapNo=no;}
-  S.route=L;S.week=S.weeks[per]?{period:per,no:S.weeks[per].no,done:S.weeks[per].done,closed:S.weeks[per].closed||null}:{period:per,no,done:{}};
+  S.route=L;S.week=S.weeks[per]?Object.assign({},S.weeks[per],{period:per}):{period:per,no,done:{}};
   save();tab='map';closeModal();fitted=false;render();
   toast((listDate(L.meta)?L.meta.date.replace(/\s*\(.*\)/,''):'Lista')+' öppnad'+(codeN?` · ${codeN} med ny kod`:'')+(hhN?` · ${hhN} med ändrat antal hushåll`:''));
-  geocodeAll(false);}
+  autoDir();geocodeAll(false);}
 // Välj PDF från telefonen. upload=true lägger dessutom upp den i Drive-mappen.
 async function importPdf(file,upload){
   toast('Läser in listan…');
@@ -834,6 +848,7 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
   switch(a){
     case 'house':openHouse(k);break;
+    case 'reverse':S.week.dir=S.week.dir===-1?1:-1;save();closeModal();render();if(tab==='map')panToNext();{const n=nextItem();toast('Rutten är vänd'+(n?' – nästa: '+n.address:''));}break;
     case 'closeweek':{const left=active().filter(i=>!status(i)).length;
       modal(`<h3 style="margin-top:0">Avsluta utdelningen?</h3><p class="muted">${left?`<b>${left} ${left===1?'adress är':'adresser är'} inte besökta.</b> De markeras som ”Ej besökt” i rapporten och kalkylarket. Det hon rapporterat om husen påverkas inte.`:'Alla adresser är besökta.'}</p><p class="muted">Du kan öppna utdelningen igen om du ångrar dig.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="doclose">Avsluta</button></div>`);break;}
     case 'doclose':{const left=active().filter(i=>!status(i));S.week.closed=Date.now();for(const i of left)touch(i);save();closeModal();tab='map';render();toast('Utdelningen är avslutad');break;}
@@ -847,13 +862,13 @@ document.addEventListener('click',async e=>{
     case 'pick':{const n=+t.dataset.n;clearTimeout(noteT);setVill(it,n);markDone(it);touch(it);closeModal();render();
       const nx=nextItem();toast((n?`${n} ex ✓`:'Inget utdelat ✓')+(nx?'  Nästa: '+nx.address:''));
       if(tab==='map')panToNext();break;}
-    case 'probpick':{clearTimeout(noteT);S.week.done[k]='ejin';const h=H(it);h.access=t.dataset.p;delete h.newCode;touch(it);closeModal();render();
+    case 'probpick':{clearTimeout(noteT);S.week.done[k]='ejin';S.week.last=k;const h=H(it);h.access=t.dataset.p;delete h.newCode;touch(it);closeModal();render();
       const nx=nextItem();toast('Rapporterat'+(nx?'  Nästa: '+nx.address:''));if(tab==='map')panToNext();break;}
     case 'done':{const was=status(it)==='klar';if(was)delete S.week.done[k];else{if(sheetKey===k&&hOf(it).vill==null)setVill(it,Math.min(1,it.hh));markDone(it);}touch(it);closeModal();render();
       if(was){toast('Ångrat');break;}
       const n=nextItem();toast(n?'Klar ✓  Nästa: '+n.address:'Klar ✓');
       if(tab==='map')panToNext();else document.getElementById(n?idOf(keyOf(n.address)):'')?.scrollIntoView({behavior:'smooth',block:'center'});break;}
-    case 'noentry':{S.week.done[k]='ejin';const h=H(it);if(!h.access)h.access=it.codes.some(missing)?'saknas':(it.tags.length&&!it.codes.length?'tagg':'kod');delete h.newCode;touch(it);afterChange();
+    case 'noentry':{S.week.done[k]='ejin';S.week.last=k;const h=H(it);if(!h.access)h.access=it.codes.some(missing)?'saknas':(it.tags.length&&!it.codes.length?'tagg':'kod');delete h.newCode;touch(it);afterChange();
       const d=$('#sheet details.more');if(d){d.open=true;d.scrollIntoView({block:'start',behavior:'smooth'});}toast('Markerat – välj vad som var fel');break;}
     case 'v+':setVill(it,(hOf(it).vill??Math.min(1,it.hh))+1);touch(it);afterChange();break;
     case 'v-':setVill(it,(hOf(it).vill??Math.min(1,it.hh))-1);touch(it);afterChange();break;

@@ -501,7 +501,9 @@ async function pullSync(){if(!S.sync.url){toast('Klistra in länken först');ret
     save();render();toast(n?`${n} hus uppdaterade från kalkylarket`:'Telefonen var redan uppdaterad');}
   catch(e){toast('Kunde inte hämta: '+(e.message||e));}}
 addEventListener('online',()=>{syncErr=null;syncNow();});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow();});
+// Är appen öppen i flera flikar: läs in det senaste som en annan flik sparat i stället för att skriva över det.
+addEventListener('storage',e=>{if(e.key!==LS||!e.newValue)return;try{const o=JSON.parse(e.newValue);if((o.updatedAt||0)>=(S.updatedAt||0)){S=Object.assign(blank(),o);render();syncUI();}}catch(_){}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')return;try{const o=JSON.parse(localStorage.getItem(LS)||'null');if(o&&(o.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(blank(),o);render();}}catch(_){}syncUI();syncNow();});
 setInterval(()=>syncNow(),60000);
 
 // ======================= INLÄSNING =======================

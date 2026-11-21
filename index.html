@@ -174,6 +174,13 @@ details.more summary{padding:8px 0;font-weight:600;color:var(--muted);cursor:poi
 body{padding-top:calc(env(safe-area-inset-top) + 2px)}
 .dinfo{font-size:14px;line-height:1.35;margin-top:6px;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .dock .chips{gap:6px}
+.numgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.num{height:58px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-size:22px;font-weight:700}
+.num.wide{grid-column:span 2;font-size:18px}
+.num:active,.problist .btn:active{transform:scale(.97)}
+.problist{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.problist .btn{padding:14px;font-size:17px}
+.dbtns .btn.warn{font-size:15px}
 </style>
 </head>
 <body>
@@ -419,7 +426,7 @@ function dock(it){const d=$('#dock');
   $('#dockInner').innerHTML=`<button class="what" data-act="house" data-k="${esc(k)}">
       <div class="meta">Nästa · nr ${nrOf(it)} · ${wantLine(it)}</div>
       <div class="addr">${esc(it.address)}</div>${chipsHTML(it)}${infoText(it)?`<div class="dinfo">📍 ${esc(infoText(it))}</div>`:''}</button>
-    <div class="dbtns"><button class="btn" data-act="house" data-k="${esc(k)}">Rapportera</button><button class="btn primary" data-act="done" data-k="${esc(k)}">Klar ✓</button></div>`;}
+    <div class="dbtns"><button class="btn warn" data-act="probopen" data-k="${esc(k)}">Kod/tagg funkade ej</button><button class="btn primary" data-act="pickopen" data-k="${esc(k)}">Klar ✓</button></div>`;}
 
 // ---------- husbladet (öppnas över kartan) ----------
 function houseHTML(it){
@@ -444,6 +451,26 @@ function houseHTML(it){
     </details>`;}
 function openHouse(k){sheetKey=k;const it=byKey(k);if(!it)return;$('#sheet').innerHTML=houseHTML(it);$('#sheet').scrollTop=0;$('#modal').classList.add('open');document.body.classList.add('noscroll');}
 function refreshSheet(){const it=byKey(sheetKey);if(!it){closeModal();return;}const sc=$('#sheet').scrollTop;const ta=document.activeElement&&document.activeElement.matches('[data-note]');if(ta)return;$('#sheet').innerHTML=houseHTML(it);$('#sheet').scrollTop=sc;}
+// ---------- snabbval från nedre listen ----------
+function pickHTML(it){const k=keyOf(it.address),h=hOf(it),max=Math.min(it.hh,12);
+  const nums=[];for(let n=1;n<=max;n++)nums.push(n);
+  return `<div class="grab"></div><div class="sheet-head"><div><div class="meta">Klar med nr ${nrOf(it)}</div><div class="addr big">${esc(it.address)}</div><div class="meta">Hur många ex delade du ut? (${it.hh} hushåll)</div></div>
+      <button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
+    ${h.vill!=null&&h.vill>0?`<div class="row"><button class="btn primary big" data-act="pick" data-n="${Math.min(h.vill,it.hh)}" data-k="${esc(k)}">Samma som förra gången: ${Math.min(h.vill,it.hh)}</button></div>`:''}
+    <div class="numgrid">${nums.map(n=>`<button class="num" data-act="pick" data-n="${n}" data-k="${esc(k)}">${n}</button>`).join('')}${it.hh>12?`<button class="num wide" data-act="pick" data-n="${it.hh}" data-k="${esc(k)}">Alla ${it.hh}</button>`:''}</div>
+    <div class="row"><button class="btn block" data-act="pick" data-n="0" data-k="${esc(k)}">Inget utdelat – ingen vill ha</button></div>
+    <div class="row"><button class="btn small" data-act="house" data-k="${esc(k)}">Fler val…</button></div>`;}
+function probHTML(it){const k=keyOf(it.address),h=hOf(it);
+  const opts=[];if(it.codes.length)opts.push(['kod','Koden fungerade inte']);if(it.tags.length)opts.push(['tagg','Taggen fungerade inte']);
+  if(!it.codes.length&&!it.tags.length)opts.push(['saknas','Kod saknas']);
+  opts.push(['last','Låst / grind stängd'],['annat','Annat problem']);
+  return `<div class="grab"></div><div class="sheet-head"><div><div class="meta">Kom inte in · nr ${nrOf(it)}</div><div class="addr big">${esc(it.address)}</div></div>
+      <button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
+    ${chipsHTML(it)}
+    <label class="lbl">Anteckning (valfritt, kommer med i rapporten)</label>
+    <textarea data-note="${esc(k)}" placeholder="t.ex. ny kod står på dörren">${esc(h.note||'')}</textarea>
+    <label class="lbl">Vad fungerade inte?</label>
+    <div class="problist">${opts.map(([p,t])=>`<button class="btn block${h.access===p?' warn':''}" data-act="probpick" data-p="${p}" data-k="${esc(k)}">${t}</button>`).join('')}</div>`;}
 function menuHTML(){return `<div class="grab"></div><div class="sheet-head"><div class="addr big">Meny</div><button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
   <label class="menuitem file"><span>📄</span><div><b>Läs in ny vecka</b><div class="muted">Välj adresslistan (PDF)</div></div><input type="file" accept="application/pdf,.pdf" data-file></label>
   <button class="menuitem" data-go="report"><span>📋</span><div><b>Rapport till arbetsgivaren</b><div class="muted">Kodproblem och hur många som vill ha reklam</div></div></button>
@@ -681,6 +708,13 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
   switch(a){
     case 'house':openHouse(k);break;
+    case 'pickopen':modal(pickHTML(it));break;
+    case 'probopen':modal(probHTML(it));break;
+    case 'pick':{const n=+t.dataset.n;clearTimeout(noteT);setVill(it,n);markDone(it);touch(it);closeModal();render();
+      const nx=nextItem();toast((n?`${n} ex ✓`:'Inget utdelat ✓')+(nx?'  Nästa: '+nx.address:''));
+      if(tab==='map')panToNext();break;}
+    case 'probpick':{clearTimeout(noteT);S.week.done[k]='ejin';const h=H(it);h.access=t.dataset.p;delete h.newCode;touch(it);closeModal();render();
+      const nx=nextItem();toast('Rapporterat'+(nx?'  Nästa: '+nx.address:''));if(tab==='map')panToNext();break;}
     case 'done':{const was=status(it)==='klar';if(was)delete S.week.done[k];else{if(sheetKey===k&&hOf(it).vill==null)setVill(it,Math.min(1,it.hh));markDone(it);}touch(it);closeModal();render();
       if(was){toast('Ångrat');break;}
       const n=nextItem();toast(n?'Klar ✓  Nästa: '+n.address:'Klar ✓');

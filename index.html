@@ -325,7 +325,8 @@ function skipReason(it){
   if(h.access&&!h.newCode)return 'Kom inte in: '+PROBLEMS[h.access].toLowerCase();
   return null;}
 const active=()=>items().filter(i=>S.showAll||!skipReason(i));
-const nextItem=()=>active().find(i=>!status(i));
+const nextItem=()=>S.week.closed?undefined:active().find(i=>!status(i));
+const notVisited=()=>S.week.closed?active().filter(i=>!status(i)):[];
 function setVill(it,v){const h=H(it);v=Math.max(0,Math.min(it.hh,v));if(v===0&&h.vill!==0)h.zeroSince=S.week.no;if(v===0&&checkDue(it))h.zeroSince=S.week.no;h.vill=v;delete h.hhChanged;}
 function markDone(it){const k=keyOf(it.address),h=H(it);S.week.done[k]='klar';delete h.access;delete h.newCode;delete h.hhChanged;if(h.vill===0)h.zeroSince=S.week.no;}
 const mapsURL=it=>{const p=posOf(it);return p?`https://maps.apple.com/?daddr=${p[0]},${p[1]}&dirflg=w`:'https://maps.apple.com/?daddr='+encodeURIComponent(it.address+', '+S.city)+'&dirflg=w';};
@@ -342,6 +343,7 @@ function flagsHTML(it){const h=hOf(it),st=status(it);let f='';
   if(checkDue(it)&&!st)f+=`<span class="flag warn">${h.hhChanged?'Antal hushåll ändrat – ':''}Kontrollera om någon vill ha</span>`;
   else if(h.hhChanged)f+=`<span class="flag warn">Antal hushåll ändrat – kolla igen</span>`;
   if(st==='ejin')f+=`<span class="flag bad">Kom inte in i dag</span>`;
+  if(!st&&S.week.closed&&!skipReason(it))f+=`<span class="flag">Ej besökt</span>`;
   if(skipReason(it)&&S.showAll)f+=`<span class="flag warn">Hoppas över i smart rutt</span>`;
   if(S.route&&S.geoDone&&!posOf(it))f+=`<span class="flag warn">Saknar plats på kartan</span>`;
   else if(isUnsure(it))f+=`<span class="flag warn">Osäker plats på kartan – flytta nålen om den är fel</span>`;
@@ -400,7 +402,8 @@ function routeHTML(all,act){
   h+=act.map(i=>cardHTML(i,nx&&i===nx)).join('');
   if(!S.showAll){const sk=all.filter(skipReason);
     if(sk.length)h+=`<details class="skipped"><summary>Hoppas över (${sk.length})</summary>${sk.map(i=>`<div class="skip-item"><div><b>${esc(i.address)}</b><div class="muted">${esc(skipReason(i))}</div></div><button class="btn small" data-act="unskip" data-k="${esc(keyOf(i.address))}">Ta med</button></div>`).join('')}</details>`;}
-  if(!remaining.length&&act.length)h+=doneHTML();
+  if(S.week.closed)h=`<div class="note">Utdelningen är avslutad${remaining.length?` – ${remaining.length} ej besökta`:''}. <a href="#" data-act="reopen">Öppna igen</a></div>`+h;
+  else if(!remaining.length&&act.length)h+=doneHTML();
   return h;}
 const doneHTML=()=>`<div class="empty"><h2>Klart för i dag! 🎉</h2><p>Rapporten till arbetsgivaren finns i menyn.</p><button class="btn primary" data-go="report">Visa rapport</button></div>`;
 function reportHTML(){if(!S.route)return `<div class="empty"><p>Ingen adresslista inläst.</p></div>`;
@@ -434,7 +437,8 @@ function setupHTML(){const m=S.route&&S.route.meta;const miss=S.route?items().fi
   </div></div>`;}
 function dock(it){const d=$('#dock');
   if(!it){d.classList.add('hidden');document.body.classList.remove('has-dock');
-    if(S.route&&(tab==='map')&&active().length&&!active().some(i=>!status(i))){d.classList.remove('hidden');document.body.classList.add('has-dock');$('#dockInner').innerHTML=`<div class="what"><div class="addr">Klart för i dag! 🎉</div><div class="meta">Rapporten finns i menyn ☰</div></div><div class="dbtns"><button class="btn primary" data-go="report">Visa rapport</button></div>`;}
+    if(S.route&&tab==='map'&&S.week.closed){const n=notVisited().length;d.classList.remove('hidden');document.body.classList.add('has-dock');$('#dockInner').innerHTML=`<div class="what"><div class="addr">Utdelningen är avslutad</div><div class="meta">${n?n+(n===1?' adress':' adresser')+' ej besökta · ':''}Rapporten finns i menyn ☰</div></div><div class="dbtns"><button class="btn" data-act="reopen">Öppna igen</button><button class="btn primary" data-go="report">Visa rapport</button></div>`;}
+    else if(S.route&&(tab==='map')&&active().length&&!active().some(i=>!status(i))){d.classList.remove('hidden');document.body.classList.add('has-dock');$('#dockInner').innerHTML=`<div class="what"><div class="addr">Klart för i dag! 🎉</div><div class="meta">Rapporten finns i menyn ☰</div></div><div class="dbtns"><button class="btn primary" data-go="report">Visa rapport</button></div>`;}
     return;}
   d.classList.remove('hidden');document.body.classList.add('has-dock');
   const k=keyOf(it.address);
@@ -489,6 +493,8 @@ function probHTML(it){const k=keyOf(it.address),h=hOf(it);
 function menuHTML(){return `<div class="grab"></div><div class="sheet-head"><div class="addr big">Meny</div><button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
   <button class="menuitem" data-go="weeks"><span>🗓</span><div><b>Adresslistor</b><div class="muted">Byt vecka – pågående, kommande och klara</div></div></button>
   <label class="menuitem file"><span>⬆︎</span><div><b>Lägg upp ny lista</b><div class="muted">Välj PDF:en – den sparas i Drive så att alla ser den</div></div><input type="file" accept="application/pdf,.pdf" data-upload></label>
+  ${S.route&&!S.week.closed?`<button class="menuitem" data-act="closeweek"><span>🏁</span><div><b>Avsluta utdelningen</b><div class="muted">När du är klar – även om alla adresser inte är besökta</div></div></button>`:''}
+  ${S.route&&S.week.closed?`<button class="menuitem" data-act="reopen"><span>↩︎</span><div><b>Öppna utdelningen igen</b><div class="muted">Den här veckan är avslutad</div></div></button>`:''}
   <button class="menuitem" data-go="report"><span>📋</span><div><b>Rapport till arbetsgivaren</b><div class="muted">Kodproblem och hur många som vill ha reklam</div></div></button>
   <button class="menuitem" data-go="setup"><span>⚙︎</span><div><b>Inställningar</b><div class="muted">Kalkylark, smart rutt, säkerhetskopia</div></div></button>`;}
 
@@ -536,7 +542,7 @@ function ensureMap(){
   map.on('click',e=>{if(!moveKey)return;const h=S.houses[moveKey]||(S.houses[moveKey]={});h.pos=[+e.latlng.lat.toFixed(6),+e.latlng.lng.toFixed(6)];moveKey=null;save();banner();drawMap();toast('Nålen är flyttad');});
   startGPS();
   return true;}
-function pinState(it,isNext){const st=status(it);if(st==='klar')return 'done';if(st==='ejin')return 'ejin';if(isNext)return 'next';if(skipReason(it))return 'skip';if(checkDue(it))return 'check';return 'todo';}
+function pinState(it,isNext){const st=status(it);if(st==='klar')return 'done';if(st==='ejin')return 'ejin';if(S.week.closed)return 'skip';if(isNext)return 'next';if(skipReason(it))return 'skip';if(checkDue(it))return 'check';return 'todo';}
 function drawMap(){
   if(!ensureMap())return;
   setTimeout(()=>map.invalidateSize(),50);
@@ -550,7 +556,7 @@ function drawMap(){
     const mk=L.marker(p,{icon,zIndexOffset:state==='next'?1000:(state==='skip'||state==='done'?-100:0)}).addTo(layer);
     mk.on('click',()=>{if(moveKey)return;openHouse(keyOf(it.address));});
     pts.push(p);
-    if(!status(it)&&!skipReason(it))route.push(p);});
+    if(!status(it)&&!skipReason(it)&&!S.week.closed)route.push(p);});
   if(route.length>1)L.polyline(route,{color:'#1f5f4a',weight:4,opacity:.75,dashArray:'6 8',interactive:false}).addTo(layer);
   if(!fitted&&pts.length&&!followMe){map.fitBounds(pts,{padding:[30,30]});fitted=true;}
   updateMeLine();banner();}
@@ -595,6 +601,8 @@ function reportText(){
   for(const i of probs){const h=hOf(i);const what=h.access?PROBLEMS[h.access]:(i.codes.some(missing)?'Kod saknas i listan':'Kom inte in');
     const cur=[...i.codes.filter(c=>!missing(c)).map(c=>'kod '+c),...i.tags.map(x=>'tagg '+x)].join(', ');
     t+=`- ${i.address}: ${what}${cur?' (i listan: '+cur+')':''}${h.note?'. '+h.note:''}\n`;}
+  const nv=notVisited();
+  if(S.week.closed)t+=`\nUtdelningen avslutades ${new Date(S.week.closed).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})}.\nEJ BESÖKTA (${nv.length})\n`+(nv.length?nv.map(i=>'- '+i.address+'\n').join(''):'Inga.\n');
   const rep=all.filter(i=>hOf(i).vill!=null&&hOf(i).vill<i.hh);
   const sumH=all.reduce((s,i)=>s+i.hh,0),sumW=all.reduce((s,i)=>s+want(i),0);
   t+=`\nVILL HA REKLAM\nBehov: ${sumW} ex av ${sumH} hushåll i distriktet.\n`;
@@ -636,7 +644,7 @@ const DEFAULT_SYNC='https://script.google.com/macros/s/AKfycby-399HqXr18u8-Zcz8X
 const syncURL=()=>S.sync.url||DEFAULT_SYNC;
 function rowFor(it){const h=hOf(it),m=S.route.meta||{},st=status(it);
   return {period:m.period||'',date:m.date||'',district:m.district||'',order:items().indexOf(it)+1,address:it.address,hh:it.hh,vill:h.vill??null,
-    status:st==='klar'?'Utdelat':st==='ejin'?'Kom inte in':'',problem:h.access?PROBLEMS[h.access]:'',note:h.note||'',updated:Date.now()};}
+    status:st==='klar'?'Utdelat':st==='ejin'?'Kom inte in':(S.week.closed&&!skipReason(it)?'Ej besökt':''),problem:h.access?PROBLEMS[h.access]:'',note:h.note||'',updated:Date.now()};}
 function touch(it){if(!it||!S.route){save();return;}const h=H(it);h.updated=Date.now();
   S.sync.queue[(S.route.meta.period||'')+'|'+keyOf(it.address)]=rowFor(it);save();scheduleSync();}
 let syncBusy=false,syncT=null,syncErr=null;
@@ -704,7 +712,7 @@ function periodNo(p){const s=String(p||'');return /^\d{5}$/.test(s)?(+s.slice(0,
 const MONTHS={jan:0,feb:1,mar:2,apr:3,maj:4,jun:5,jul:6,aug:7,sep:8,okt:9,nov:10,dec:11};
 function listDate(meta){const m=String(meta&&meta.date||'').match(/(\d{1,2})\.\s*([a-zåäö]{3})[a-zåäö]*\.?\s*(\d{4})/i);
   return m&&MONTHS[m[2].toLowerCase()]!=null?new Date(+m[3],MONTHS[m[2].toLowerCase()],+m[1]):null;}
-function storeCurrent(){if(S.route&&S.week.period){S.lists[S.week.period]=S.route;S.weeks[S.week.period]={no:S.week.no,done:S.week.done};}}
+function storeCurrent(){if(S.route&&S.week.period){S.lists[S.week.period]=S.route;S.weeks[S.week.period]={no:S.week.no,done:S.week.done,closed:S.week.closed||null};}}
 // Lägger in en tolkad lista och öppnar den.
 function addList(r,fileId){
   const per=String(r.meta.period);
@@ -723,7 +731,7 @@ function openList(per){
       if(h.hh!=null&&h.hh!==it.hh){h.hhChanged=true;hhN++;}
       h.snap=snap;h.hh=it.hh;if(h.zeroSince==null&&h.vill===0)h.zeroSince=no;}
     S.snapNo=no;}
-  S.route=L;S.week=S.weeks[per]?{period:per,no:S.weeks[per].no,done:S.weeks[per].done}:{period:per,no,done:{}};
+  S.route=L;S.week=S.weeks[per]?{period:per,no:S.weeks[per].no,done:S.weeks[per].done,closed:S.weeks[per].closed||null}:{period:per,no,done:{}};
   save();tab='map';closeModal();fitted=false;render();
   toast((listDate(L.meta)?L.meta.date.replace(/\s*\(.*\)/,''):'Lista')+' öppnad'+(codeN?` · ${codeN} med ny kod`:'')+(hhN?` · ${hhN} med ändrat antal hushåll`:''));
   geocodeAll(false);}
@@ -774,6 +782,7 @@ function weekStatus(per){
     if(!skip)total++;}
   const d=listDate(L.meta),today=new Date();today.setHours(0,0,0,0);
   if(total&&done>=total)return {label:'Klar ✓',cls:'ok'};
+  if(w.closed)return {label:`Avslutad ${done}/${total}`,cls:'ok'};
   if(done)return {label:`Pågår ${done}/${total}`,cls:'warn'};
   if(d&&d>today)return {label:'Kommande',cls:'info'};
   return {label:'Ej påbörjad',cls:''};}
@@ -825,6 +834,10 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
   switch(a){
     case 'house':openHouse(k);break;
+    case 'closeweek':{const left=active().filter(i=>!status(i)).length;
+      modal(`<h3 style="margin-top:0">Avsluta utdelningen?</h3><p class="muted">${left?`<b>${left} ${left===1?'adress är':'adresser är'} inte besökta.</b> De markeras som ”Ej besökt” i rapporten och kalkylarket. Det hon rapporterat om husen påverkas inte.`:'Alla adresser är besökta.'}</p><p class="muted">Du kan öppna utdelningen igen om du ångrar dig.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="doclose">Avsluta</button></div>`);break;}
+    case 'doclose':{const left=active().filter(i=>!status(i));S.week.closed=Date.now();for(const i of left)touch(i);save();closeModal();tab='map';render();toast('Utdelningen är avslutad');break;}
+    case 'reopen':{const left=active().filter(i=>!status(i));S.week.closed=null;for(const i of left)touch(i);save();closeModal();render();toast('Utdelningen är öppen igen');break;}
     case 'pinsubmit':submitPin();break;
     case 'openlist':openList(t.dataset.p);break;
     case 'refreshlists':loadRemote();break;

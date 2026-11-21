@@ -199,7 +199,7 @@ body{padding-top:calc(env(safe-area-inset-top) + 2px)}
 .btn.hero{width:100%;max-width:420px;padding:20px;font-size:21px;border-radius:18px;flex-direction:column;gap:4px}
 .btn.hero small,.btn.hero2 small{font-size:14px;font-weight:500;opacity:.85}
 .btn.hero2{width:100%;max-width:420px;padding:15px;font-size:17px;border-radius:16px;flex-direction:column;gap:2px}
-.homelinks{display:flex;gap:18px;justify-content:center;margin-top:auto;padding-top:30px}
+.homelinks{display:flex;gap:6px 18px;justify-content:center;flex-wrap:wrap;margin-top:auto;padding-top:30px}
 .linkbtn{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:15px;padding:8px}
 .a2hs{max-width:420px;width:100%;text-align:left;font-size:14px;background:var(--info-soft);border-radius:14px;padding:12px 14px;margin-top:6px}
 .a2hs b{display:block;margin-bottom:2px}
@@ -512,10 +512,9 @@ function homeHTML(){
   return `<div class="home"><div class="logo">📬</div><h1>Reklamutdelning</h1>
     <p class="muted">${S.route?'':'Välkommen! Tryck på knappen för att hämta veckans adresslista.'}</p>
     ${b}
-    ${installEvt&&!isStandalone()?`<button class="btn hero2" data-act="install">📲 Installera appen<small>Läggs på startskärmen och öppnas utan adressfält</small></button>`:''}
     ${!installEvt&&isAndroid()&&!isStandalone()?`<div class="a2hs"><b>Tips: gör den till en app utan adressfält</b><b style="display:inline">Chrome:</b> ⋮ → Lägg till på startskärmen → Installera.<br><b style="display:inline">Samsung Internet:</b> ☰ → Lägg till sida på → Startskärm.<br>Öppna sedan appen från ikonen. Har du lagt till den tidigare – ta bort den gamla ikonen först.</div>`:''}
     ${isIOS()&&!isStandalone()?`<div class="a2hs"><b>Tips: gör den till en app utan adressfält</b>Tryck på dela-knappen <span aria-hidden="true">⎙</span> i Safari → <b style="display:inline">Lägg till på hemskärmen</b>, och öppna sedan appen från ikonen. Första gången där skriver du PIN-koden igen.</div>`:''}
-    <div class="homelinks"><button class="linkbtn" data-go="weeks">Adresslistor</button>${S.route?'<button class="linkbtn" data-go="report">Rapport</button>':''}<button class="linkbtn" data-go="setup">Inställningar</button></div></div>`;}
+    <div class="homelinks">${installEvt&&!isStandalone()?'<button class="linkbtn" data-act="install">Installera appen</button>':''}<button class="linkbtn" data-go="weeks">Adresslistor</button>${S.route?'<button class="linkbtn" data-go="report">Rapport</button>':''}<button class="linkbtn" data-go="setup">Inställningar</button></div></div>`;}
 // ---------- husbladet (öppnas över kartan) ----------
 function houseHTML(it){
   const k=keyOf(it.address),h=hOf(it),st=status(it),v=h.vill??Math.min(1,it.hh);

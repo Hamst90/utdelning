@@ -490,6 +490,11 @@ function weekFinished(){return S.route&&(S.week.closed||(active().length&&!activ
 const shortDate=meta=>{const d=listDate(meta);return d?d.toLocaleDateString('sv-SE',{day:'numeric',month:'short'}):'nästa';};
 // ---------- startsida ----------
 const isStandalone=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+const isAndroid=()=>/Android/i.test(navigator.userAgent);
+let installEvt=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(tab==='home')render();});
+addEventListener('appinstalled',()=>{installEvt=null;if(tab==='home')render();toast('Appen är installerad – öppna den från startskärmen');});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 const isIOS=()=>/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const started=()=>S.route&&!weekFinished()&&Object.keys(S.week.done).length>0;
 function startTarget(){ // vad "Starta utdelning" öppnar
@@ -507,6 +512,8 @@ function homeHTML(){
   return `<div class="home"><div class="logo">📬</div><h1>Reklamutdelning</h1>
     <p class="muted">${S.route?'':'Välkommen! Tryck på knappen för att hämta veckans adresslista.'}</p>
     ${b}
+    ${installEvt&&!isStandalone()?`<button class="btn hero2" data-act="install">📲 Installera appen<small>Läggs på startskärmen och öppnas utan adressfält</small></button>`:''}
+    ${!installEvt&&isAndroid()&&!isStandalone()?`<div class="a2hs"><b>Tips: gör den till en app utan adressfält</b><b style="display:inline">Chrome:</b> ⋮ → Lägg till på startskärmen → Installera.<br><b style="display:inline">Samsung Internet:</b> ☰ → Lägg till sida på → Startskärm.<br>Öppna sedan appen från ikonen. Har du lagt till den tidigare – ta bort den gamla ikonen först.</div>`:''}
     ${isIOS()&&!isStandalone()?`<div class="a2hs"><b>Tips: gör den till en app utan adressfält</b>Tryck på dela-knappen <span aria-hidden="true">⎙</span> i Safari → <b style="display:inline">Lägg till på hemskärmen</b>, och öppna sedan appen från ikonen. Första gången där skriver du PIN-koden igen.</div>`:''}
     <div class="homelinks"><button class="linkbtn" data-go="weeks">Adresslistor</button>${S.route?'<button class="linkbtn" data-go="report">Rapport</button>':''}<button class="linkbtn" data-go="setup">Inställningar</button></div></div>`;}
 // ---------- husbladet (öppnas över kartan) ----------
@@ -922,6 +929,7 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
   switch(a){
     case 'house':openHouse(k);break;
+    case 'install':if(installEvt){installEvt.prompt();installEvt.userChoice.finally(()=>{installEvt=null;render();});}break;
     case 'resume':if(S.week.closed){S.week.closed=null;for(const i of active().filter(i=>!status(i)))touch(i);save();}tab='map';render();break;
     case 'startnew':{const tg=startTarget();if(tg){if(tg===S.week.period){tab='map';render();}else openList(tg);}else{go(S.pin?'weeks':'pin');if(S.pin)toast('Välj vilken adresslista du vill dela ut');}break;}
     case 'back':tab=(tab==='weeks'||tab==='pin'||!S.route)?'home':'map';render();scrollTo(0,0);break;

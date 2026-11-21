@@ -8,13 +8,37 @@
  * Kopiera webbappens länk (slutar på /exec) och klistra in den i appen under Lista → Kalkylark.
  *
  * Fliken "Rapporter" skapas automatiskt: en rad per hus och vecka.
- * Lägg till skriptegenskapen PIN (Projektinställningar → Skriptegenskaper) för att kunna hämta rapporterna till en ny telefon.
+ * Lägg till skriptegenskapen PIN (Projektinställningar → Skriptegenskaper). Den krävs för att hämta rapporterna
+ * och adresslistorna (PDF:erna innehåller portkoder) och för att ladda upp nya listor.
+ * Kör funktionen installera() en gång: den skapar Drive-mappen för adresslistorna.
  */
 
 const FLIK = 'Rapporter';
 const KOLUMNER = ['Period', 'Datum', 'Distrikt', 'Nr', 'Adress', 'Hushåll', 'Vill ha reklam',
   'Status', 'Problem', 'Anteckning', 'Uppdaterad', 'Nyckel'];
 const NYCKEL_KOL = KOLUMNER.length; // sista kolumnen
+const MAPPNAMN = 'Utdelning – adresslistor';
+
+function pinOk_(pin) {
+  const ratt = PropertiesService.getScriptProperties().getProperty('PIN');
+  return !!ratt && String(pin || '') === String(ratt);
+}
+
+/** Drive-mappen där adresslistorna (PDF) ligger. Skapas första gången. */
+function mapp_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('MAPP');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  const m = DriveApp.createFolder(MAPPNAMN);
+  props.setProperty('MAPP', m.getId());
+  return m;
+}
+
+/** Kör en gång från redigeraren för att godkänna Drive-behörigheten och skapa mappen. */
+function installera() {
+  const m = mapp_();
+  Logger.log('Lägg adresslistorna (PDF) i: ' + m.getUrl());
+}
 
 function flik_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -45,6 +69,14 @@ function doPost(e) {
   lock.waitLock(20000);
   try {
     const data = JSON.parse(e.postData.contents);
+    if (data.action === 'upload') {
+      if (!pinOk_(data.pin)) return svar_({ ok: false, error: 'PIN' });
+      const namn = String(data.name || 'Adresslista.pdf').replace(/[\\/]/g, '-');
+      const befintliga = mapp_().getFilesByName(namn);
+      while (befintliga.hasNext()) befintliga.next().setTrashed(true); // samma lista igen ersätter den gamla
+      const fil = mapp_().createFile(Utilities.newBlob(Utilities.base64Decode(data.data), 'application/pdf', namn));
+      return svar_({ ok: true, id: fil.getId() });
+    }
     const rader = Array.isArray(data.rows) ? data.rows : [];
     const sh = flik_();
     const sista = sh.getLastRow();
@@ -74,8 +106,10 @@ function doPost(e) {
 }
 
 /**
- * Appen hämtar raderna härifrån (för att återställa på en ny telefon). Kräver PIN-koden som
- * sparas under Projektinställningar → Skriptegenskaper → PIN. Utan rätt PIN lämnas inget ut.
+ * Appen hämtar härifrån. Allt utom ?ping=1 kräver PIN-koden (Projektinställningar → Skriptegenskaper → PIN):
+ *   ?pin=…                 rapportraderna (för att återställa på en ny telefon)
+ *   ?action=lists&pin=…    adresslistorna (PDF) i Drive-mappen
+ *   ?action=pdf&id=…&pin=… en adresslista, base64-kodad
  * ?ping=1 svarar bara med antalet rader (för att testa kopplingen).
  */
 function doGet(e) {
@@ -83,8 +117,22 @@ function doGet(e) {
   const sh = flik_();
   const sista = sh.getLastRow();
   if (p.ping) return svar_({ ok: true, rows: Math.max(0, sista - 1) });
-  const pin = PropertiesService.getScriptProperties().getProperty('PIN');
-  if (!pin || String(p.pin || '') !== String(pin)) return svar_({ ok: false, error: 'PIN' });
+  if (!pinOk_(p.pin)) return svar_({ ok: false, error: 'PIN' });
+  if (p.action === 'lists') {
+    const filer = [], it = mapp_().getFiles();
+    while (it.hasNext()) {
+      const f = it.next();
+      if (f.getMimeType() === 'application/pdf' || /\.pdf$/i.test(f.getName()))
+        filer.push({ id: f.getId(), name: f.getName(), modified: f.getLastUpdated().getTime(), size: f.getSize() });
+    }
+    filer.sort((a, b) => b.modified - a.modified);
+    return svar_({ ok: true, files: filer });
+  }
+  if (p.action === 'pdf') {
+    const f = DriveApp.getFileById(p.id);
+    if (!f.getParents().hasNext() || f.getParents().next().getId() !== mapp_().getId()) return svar_({ ok: false, error: 'Okänd fil' });
+    return svar_({ ok: true, name: f.getName(), data: Utilities.base64Encode(f.getBlob().getBytes()) });
+  }
   if (sista < 2) return svar_({ ok: true, rows: [] });
   const v = sh.getRange(2, 1, sista - 1, KOLUMNER.length).getValues();
   const rader = v.map(r => ({

@@ -182,6 +182,11 @@ body{padding-top:calc(env(safe-area-inset-top) + 2px)}
 .problist .btn{padding:14px;font-size:17px}
 .dbtns .btn.warn{font-size:15px}
 #btnMe.on{background:#1a73e8;color:#fff;border-color:#1a73e8}
+.weekcard{align-items:center}
+.weekcard .flag{margin:0;white-space:nowrap}
+.flag.info{background:#e1ecf7;color:#1a5fa8}
+@media (prefers-color-scheme: dark){.flag.info{background:#1b2a3a;color:#8bb8ec}}
+.toolbar .btn.file{position:relative;overflow:hidden}
 </style>
 </head>
 <body>
@@ -194,6 +199,7 @@ body{padding-top:calc(env(safe-area-inset-top) + 2px)}
     </nav>
     <button class="iconbtn" data-act="menu" aria-label="Meny">☰</button>
   </div>
+  <h1 class="hidden" id="plainTitle" style="margin:16px 0 12px"></h1>
   <div class="backbar hidden" id="backbar"><button class="btn small" data-tab="map">‹ Tillbaka</button><b id="backTitle"></b></div>
   <div id="mapWrap" class="hidden">
     <div id="map"></div>
@@ -294,9 +300,13 @@ const keyOf=a=>a.toLowerCase().replace(/\s+/g,' ').trim();
 const missing=c=>/\?{2,}/.test(c);
 const idOf=k=>'c-'+k.replace(/[^a-z0-9åäö]/g,'_');
 
-function blank(){return {v:2,updatedAt:0,city:'Linköping',route:null,houses:{},week:{period:null,no:0,done:{}},showAll:false,geo:{},sync:{url:'',queue:{},last:0}};}
+function blank(){return {v:2,updatedAt:0,city:'Linköping',route:null,houses:{},week:{period:null,no:0,done:{}},showAll:false,geo:{},sync:{url:'',queue:{},last:0},lists:{},weeks:{},fileMap:{},remote:[],pin:'',snapNo:0};}
 let S=blank();
-function load(){try{const j=localStorage.getItem(LS);if(j)S=Object.assign(blank(),JSON.parse(j));}catch(e){}}
+function load(){try{const j=localStorage.getItem(LS);if(j)S=Object.assign(blank(),JSON.parse(j));}catch(e){}
+  // Uppgradering från en lista åt gången: spara den öppna listan bland listorna och räkna om veckonumren.
+  if(S.route&&S.week.period&&!S.lists[S.week.period])S.lists[S.week.period]=S.route;
+  const pn=periodNo(S.week.period);
+  if(pn&&S.week.no<1000){const off=pn-S.week.no;for(const h of Object.values(S.houses))if(h.zeroSince!=null)h.zeroSince+=off;S.week.no=pn;S.snapNo=pn;save();}}
 function save(){S.updatedAt=Date.now();try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){toast('Kunde inte spara i telefonen');}}
 let tab='map',open=null,sheetKey=null;
 
@@ -350,15 +360,18 @@ function render(){
   const skipN=all.filter(skipReason).length;
   $('#subtitle').textContent=has?`${doneN} av ${act.length} hus · ${ex} av ${exTot} ex`+(skipN?` · ${skipN} hoppas över`:''):'Ingen adresslista inläst';
   $('#bar').style.width=act.length?(100*doneN/act.length)+'%':'0';
+  if(!has&&(tab==='map'||tab==='route'))tab=S.pin?'weeks':'pin';
   const main=tab==='map'||tab==='route';
   $('#tabs').classList.toggle('invisible',!has);$('#topbar').classList.toggle('hidden',!main);
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
-  $('#backbar').classList.toggle('hidden',main);
-  $('#backTitle').textContent=tab==='report'?'Rapport':tab==='setup'?'Inställningar':'';
+  $('#backbar').classList.toggle('hidden',main||(!has&&(tab==='weeks'||tab==='pin')));
+  $('#backTitle').textContent={report:'Rapport',setup:'Inställningar',weeks:'Adresslistor',pin:'PIN-kod'}[tab]||'';
+  $('#plainTitle').textContent=!has&&tab==='weeks'?'Adresslistor':'';$('#plainTitle').classList.toggle('hidden',!(!has&&tab==='weeks'));
   const showMap=has&&tab==='map';
   $('#mapWrap').classList.toggle('hidden',!showMap);
   const v=$('#view');
-  if(!has&&main){v.innerHTML=emptyHTML();dock(null);return;}
+  if(tab==='pin'){v.innerHTML=pinHTML();dock(null);setTimeout(()=>$('#pinStart')?.focus(),50);return;}
+  if(tab==='weeks'){v.innerHTML=weeksHTML();dock(null);return;}
   if(tab==='route')v.innerHTML=routeHTML(all,act);
   else if(tab==='map')v.innerHTML='';
   else if(tab==='report')v.innerHTML=reportHTML();
@@ -396,7 +409,8 @@ function reportHTML(){if(!S.route)return `<div class="empty"><p>Ingen adresslist
 function setupHTML(){const m=S.route&&S.route.meta;const miss=S.route?items().filter(i=>!posOf(i)).length:0;
   return `<div class="section-title">Adresslista</div><div class="card static"><div class="body">
     ${m?`<div><b>Distrikt ${esc(m.district||'')}</b> · period ${esc(m.period||'')}</div><div class="muted" style="font-size:14px">${S.route.items.length} adresser · inläst ${new Date(S.route.importedAt).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})}${miss?` · ${miss} saknar plats på kartan`:''}</div>`:'<div class="muted">Ingen lista inläst ännu.</div>'}
-    <div class="row"><label class="btn primary file">Läs in ny vecka (PDF)…<input type="file" accept="application/pdf,.pdf" data-file></label></div>
+    <div class="row"><button class="btn primary" data-go="weeks">Adresslistor</button></div>
+    <div class="row"><span class="muted" style="font-size:14px;align-self:center">${S.pin?'PIN-koden är sparad i telefonen.':'Ingen PIN-kod sparad.'}</span>${S.pin?'<button class="btn small" data-act="forgetpin">Glöm PIN</button>':'<button class="btn small" data-go="pin">Ange PIN</button>'}</div>
     <p class="muted" style="font-size:13px;margin:10px 0 0">Det hon rapporterat (vill ha reklam, problem med kod) sparas mellan veckorna. En ny period nollställer bara bockarna. Byts koden i listan för ett hus med kodproblem tas huset med igen och märks ”Ny kod”. Hus där ingen vill ha reklam tas med för kontroll var ${CHECK_EVERY}:e vecka, eller direkt om antalet hushåll ändras i listan.</p>
   </div></div>
   <div class="section-title">Kalkylark</div><div class="card static"><div class="body">
@@ -473,7 +487,8 @@ function probHTML(it){const k=keyOf(it.address),h=hOf(it);
     <label class="lbl">Vad fungerade inte?</label>
     <div class="problist">${opts.map(([p,t])=>`<button class="btn block${h.access===p?' warn':''}" data-act="probpick" data-p="${p}" data-k="${esc(k)}">${t}</button>`).join('')}</div>`;}
 function menuHTML(){return `<div class="grab"></div><div class="sheet-head"><div class="addr big">Meny</div><button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
-  <label class="menuitem file"><span>📄</span><div><b>Läs in ny vecka</b><div class="muted">Välj adresslistan (PDF)</div></div><input type="file" accept="application/pdf,.pdf" data-file></label>
+  <button class="menuitem" data-go="weeks"><span>🗓</span><div><b>Adresslistor</b><div class="muted">Byt vecka – pågående, kommande och klara</div></div></button>
+  <label class="menuitem file"><span>⬆︎</span><div><b>Lägg upp ny lista</b><div class="muted">Välj PDF:en – den sparas i Drive så att alla ser den</div></div><input type="file" accept="application/pdf,.pdf" data-upload></label>
   <button class="menuitem" data-go="report"><span>📋</span><div><b>Rapport till arbetsgivaren</b><div class="muted">Kodproblem och hur många som vill ha reklam</div></div></button>
   <button class="menuitem" data-go="setup"><span>⚙︎</span><div><b>Inställningar</b><div class="muted">Kalkylark, smart rutt, säkerhetskopia</div></div></button>`;}
 
@@ -651,7 +666,7 @@ async function getSync(q){const r=await fetch(syncURL()+(q||''),{redirect:'follo
 async function testSync(){
   try{const j=await getSync('?ping=1');toast(`Kopplat ✓ ${j.rows} rader i kalkylarket`);syncErr=null;scheduleSync(100);}
   catch(e){modal(`<h3 style="margin-top:0">Kunde inte nå kalkylarket</h3><p class="muted">${esc(e.message||e)}</p><p class="muted">Kontrollera att länken slutar på /exec och att webbappen är publicerad med <b>Vem har åtkomst: Alla</b>.</p><button class="btn block" data-act="close">Stäng</button>`);}}
-function pullSync(){modal(`<h3 style="margin-top:0">Hämta från kalkylarket</h3><p class="muted">Ange PIN-koden för att hämta det som rapporterats tidigare, till exempel på en ny telefon.</p>
+function pullSync(){if(S.pin){doPull(S.pin);return;}modal(`<h3 style="margin-top:0">Hämta från kalkylarket</h3><p class="muted">Ange PIN-koden för att hämta det som rapporterats tidigare, till exempel på en ny telefon.</p>
   <input type="text" id="pinIn" inputmode="numeric" autocomplete="off" placeholder="PIN-kod" style="font-size:22px;letter-spacing:.2em;text-align:center">
   <div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="dopull">Hämta</button></div>`);setTimeout(()=>$('#pinIn')?.focus(),50);}
 async function doPull(pin){
@@ -672,37 +687,126 @@ addEventListener('storage',e=>{if(e.key!==LS||!e.newValue)return;try{const o=JSO
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='visible')return;try{const o=JSON.parse(localStorage.getItem(LS)||'null');if(o&&(o.updatedAt||0)>(S.updatedAt||0)){S=Object.assign(blank(),o);render();}}catch(_){}syncUI();syncNow();});
 setInterval(()=>syncNow(),60000);
 
-// ======================= INLÄSNING =======================
+// ======================= ADRESSLISTOR (PDF) =======================
 let pdfjs=null;
 async function loadPdfjs(){if(pdfjs)return pdfjs;const w=await import('./pdf.worker.min.js');globalThis.pdfjsWorker=w;pdfjs=await import('./pdf.min.js');return pdfjs;}
-async function importPdf(file){
+async function parsePdf(bytes){
+  const lib=await loadPdfjs();
+  const doc=await lib.getDocument({data:bytes}).promise;
+  const pages=[];
+  for(let p=1;p<=doc.numPages;p++){const tc=await (await doc.getPage(p)).getTextContent();pages.push(tc.items.map(i=>({str:i.str,x:i.transform[4],y:i.transform[5],w:i.width})));}
+  const r=parseRouteItems(pages);
+  if(!r.items.length)throw new Error('Hittade inga adresser i filen.');
+  if(!r.meta.period)r.meta.period='x'+Date.now();
+  return r;}
+// Veckonummer ur perioden (t.ex. 26471 → år 26, vecka 47) – används för kontrollrundan.
+function periodNo(p){const s=String(p||'');return /^\d{5}$/.test(s)?(+s.slice(0,2))*53+(+s.slice(2,4)):null;}
+const MONTHS={jan:0,feb:1,mar:2,apr:3,maj:4,jun:5,jul:6,aug:7,sep:8,okt:9,nov:10,dec:11};
+function listDate(meta){const m=String(meta&&meta.date||'').match(/(\d{1,2})\.\s*([a-zåäö]{3})[a-zåäö]*\.?\s*(\d{4})/i);
+  return m&&MONTHS[m[2].toLowerCase()]!=null?new Date(+m[3],MONTHS[m[2].toLowerCase()],+m[1]):null;}
+function storeCurrent(){if(S.route&&S.week.period){S.lists[S.week.period]=S.route;S.weeks[S.week.period]={no:S.week.no,done:S.week.done};}}
+// Lägger in en tolkad lista och öppnar den.
+function addList(r,fileId){
+  const per=String(r.meta.period);
+  S.lists[per]={meta:r.meta,items:r.items,importedAt:Date.now(),fileId:fileId||(S.lists[per]&&S.lists[per].fileId)||null};
+  if(fileId)S.fileMap[fileId]=per;
+  return per;}
+function openList(per){
+  storeCurrent();
+  const L=S.lists[per];if(!L)return;
+  const no=periodNo(per)??((S.week.no||0)+1);
+  let codeN=0,hhN=0;
+  // Jämför koder och antal hushåll bara mot äldre listor, så att en gammal vecka inte ger falska "ny kod".
+  if(no>=(S.snapNo||0)){
+    for(const it of L.items){const h=H(it),snap=JSON.stringify([it.codes,it.tags]);
+      if(h.snap&&h.snap!==snap){h.newCode=true;codeN++;}else if(no>(S.snapNo||0))delete h.newCode;
+      if(h.hh!=null&&h.hh!==it.hh){h.hhChanged=true;hhN++;}
+      h.snap=snap;h.hh=it.hh;if(h.zeroSince==null&&h.vill===0)h.zeroSince=no;}
+    S.snapNo=no;}
+  S.route=L;S.week=S.weeks[per]?{period:per,no:S.weeks[per].no,done:S.weeks[per].done}:{period:per,no,done:{}};
+  save();tab='map';closeModal();fitted=false;render();
+  toast((listDate(L.meta)?L.meta.date.replace(/\s*\(.*\)/,''):'Lista')+' öppnad'+(codeN?` · ${codeN} med ny kod`:'')+(hhN?` · ${hhN} med ändrat antal hushåll`:''));
+  geocodeAll(false);}
+// Välj PDF från telefonen. upload=true lägger dessutom upp den i Drive-mappen.
+async function importPdf(file,upload){
   toast('Läser in listan…');
   try{
-    const lib=await loadPdfjs();
-    const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
-    const pages=[];
-    for(let p=1;p<=doc.numPages;p++){const tc=await (await doc.getPage(p)).getTextContent();pages.push(tc.items.map(i=>({str:i.str,x:i.transform[4],y:i.transform[5],w:i.width})));}
-    const r=parseRouteItems(pages);
-    if(!r.items.length)throw new Error('Hittade inga adresser i filen.');
-    const newPeriod=!S.route||(r.meta.period||'')!==(S.route.meta.period||'');
-    if(newPeriod){S.week={period:r.meta.period||null,no:(S.week.no||0)+(S.route?1:0),done:{}};}
-    let codeN=0,hhN=0;
-    for(const it of r.items){const h=H(it),snap=JSON.stringify([it.codes,it.tags]);
-      if(h.snap&&h.snap!==snap){h.newCode=true;codeN++;}else if(newPeriod)delete h.newCode;
-      if(h.hh!=null&&h.hh!==it.hh){h.hhChanged=true;hhN++;}
-      h.snap=snap;h.hh=it.hh;if(h.zeroSince==null&&h.vill===0)h.zeroSince=S.week.no;}
-    S.route={meta:r.meta,items:r.items,importedAt:Date.now()};
-    save();tab='map';closeModal();fitted=false;render();
-    toast(`${r.items.length} adresser inlästa`+(codeN?` · ${codeN} med ny kod`:'')+(hhN?` · ${hhN} med ändrat antal hushåll`:''));
-    geocodeAll(false);
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    const r=await parsePdf(bytes.slice());
+    let fileId=null;
+    if(upload){
+      if(!S.pin){toast('Ange PIN-koden först');tab='pin';render();return;}
+      toast('Laddar upp…');
+      const d=listDate(r.meta),iso=d?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} `:'';
+      const res=await fetch(syncURL(),{method:'POST',body:JSON.stringify({action:'upload',pin:S.pin,name:`${iso}Distrikt ${r.meta.district||''} (period ${r.meta.period}).pdf`,data:b64(bytes)}),redirect:'follow'}).then(x=>x.json());
+      if(!res.ok)throw new Error(res.error==='PIN'?'Fel PIN-kod':res.error||'Uppladdningen misslyckades');
+      fileId=res.id;loadRemote();}
+    openList(addList(r,fileId));
+    if(upload)toast('Listan är uppladdad och öppnad');
   }catch(e){console.error(e);modal(`<h3 style="margin-top:0">Kunde inte läsa filen</h3><p class="muted">${esc(e.message||e)}</p><p class="muted">Kontrollera att det är adresslistan som PDF från utdelare.nu.</p><button class="btn block" data-act="close">Stäng</button>`);}
 }
+function b64(bytes){let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(s);}
+function unb64(s){const bin=atob(s),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a;}
 
+// ---------- listor i Drive ----------
+let remoteBusy=false,remoteErr=null;
+async function loadRemote(){
+  if(!S.pin||remoteBusy)return;remoteBusy=true;remoteErr=null;if(tab==='weeks')render();
+  try{const j=await fetch(syncURL()+'?action=lists&pin='+encodeURIComponent(S.pin),{redirect:'follow'}).then(x=>x.json());
+    if(!j.ok){if(j.error==='PIN'){S.pin='';save();remoteBusy=false;tab='pin';render();toast('PIN-koden stämmer inte längre');return;}throw new Error(j.error);}
+    const before=new Set(Object.keys(S.fileMap));
+    S.remote=j.files;save();
+    // Hämta och tolka nya listor i bakgrunden så att datum och status kan visas.
+    for(const f of j.files){if(S.fileMap[f.id])continue;
+      try{const p=await fetch(syncURL()+'?action=pdf&id='+encodeURIComponent(f.id)+'&pin='+encodeURIComponent(S.pin),{redirect:'follow'}).then(x=>x.json());
+        if(!p.ok)continue;const r=await parsePdf(unb64(p.data));addList(r,f.id);save();if(tab==='weeks')render();}catch(e){console.error(e);}}
+    const fresh=j.files.filter(f=>!before.has(f.id)&&S.fileMap[f.id]&&S.fileMap[f.id]!==S.week.period);
+    if(fresh.length&&S.route&&tab!=='weeks')toast(`${fresh.length===1?'En ny adresslista':fresh.length+' nya adresslistor'} – ☰ → Adresslistor`);
+  }catch(e){remoteErr=String(e.message||e);}
+  remoteBusy=false;if(tab==='weeks')render();}
+function weekStatus(per){
+  const L=S.lists[per];if(!L)return {label:'',cls:''};
+  const w=per===S.week.period?S.week:(S.weeks[per]||{done:{}});
+  let done=0,total=0;
+  for(const it of L.items){const k=keyOf(it.address),h=S.houses[k]||{};
+    if(w.done[k]){done++;total++;continue;}
+    const skip=(h.vill===0&&!(h.hhChanged||((w.no||0)-(h.zeroSince??w.no))>=CHECK_EVERY))||(h.access&&!h.newCode);
+    if(!skip)total++;}
+  const d=listDate(L.meta),today=new Date();today.setHours(0,0,0,0);
+  if(total&&done>=total)return {label:'Klar ✓',cls:'ok'};
+  if(done)return {label:`Pågår ${done}/${total}`,cls:'warn'};
+  if(d&&d>today)return {label:'Kommande',cls:'info'};
+  return {label:'Ej påbörjad',cls:''};}
+function weeksHTML(){
+  const pers=Object.keys(S.lists).sort((a,b)=>(listDate(S.lists[b].meta)||0)-(listDate(S.lists[a].meta)||0)||String(b).localeCompare(String(a)));
+  const pending=(S.remote||[]).filter(f=>!S.fileMap[f.id]);
+  let h=`<div class="toolbar"><button class="btn small" data-act="refreshlists">${remoteBusy?'Hämtar…':'↻ Uppdatera'}</button>
+    <label class="btn small file">Lägg upp ny lista<input type="file" accept="application/pdf,.pdf" data-upload></label></div>`;
+  if(remoteErr)h+=`<p class="muted" style="font-size:14px">Kunde inte hämta listorna: ${esc(remoteErr)}</p>`;
+  if(!pers.length&&!pending.length)h+=`<div class="empty"><p>${remoteBusy?'Hämtar adresslistorna…':'Inga adresslistor ännu. Lägg PDF:en i Drive-mappen eller tryck <b>Lägg upp ny lista</b>.'}</p></div>`;
+  for(const per of pers){const L=S.lists[per],st=weekStatus(per),cur=per===S.week.period&&S.route;
+    h+=`<button class="card weekcard${cur?' next':''}" data-act="openlist" data-p="${esc(per)}">
+      <div class="cbody"><div class="addr">${esc((L.meta.date||'Adresslista').replace(/\s*\(.*\)/,''))}</div>
+      <div class="meta">Distrikt ${esc(L.meta.district||'')} · ${L.items.length} adresser · period ${esc(per)}${cur?' · <b>öppen nu</b>':''}</div></div>
+      <span class="flag ${st.cls}">${esc(st.label)}</span></button>`;}
+  for(const f of pending)h+=`<div class="card static"><div class="body"><b>${esc(f.name)}</b><div class="muted" style="font-size:13px">Hämtas…</div></div></div>`;
+  h+=`<div class="row"><label class="btn small file">Öppna PDF från telefonen (utan att ladda upp)<input type="file" accept="application/pdf,.pdf" data-file></label></div>`;
+  return h;}
+function pinHTML(){return `<div class="empty"><h2>Utdelningsrutt</h2><p>Skriv PIN-koden för att hämta adresslistorna.</p>
+  <input type="text" id="pinStart" inputmode="numeric" autocomplete="off" placeholder="PIN-kod" style="font-size:26px;letter-spacing:.25em;text-align:center;max-width:240px">
+  <div class="row" style="justify-content:center"><button class="btn primary" data-act="pinsubmit" style="flex:0 0 240px">Fortsätt</button></div>
+  <div class="row" style="justify-content:center;margin-top:24px"><label class="btn small file">Öppna PDF från telefonen i stället<input type="file" accept="application/pdf,.pdf" data-file></label></div></div>`;}
+async function submitPin(){const v=($('#pinStart')?.value||'').trim();if(!v){toast('Skriv PIN-koden');return;}
+  try{const j=await fetch(syncURL()+'?action=lists&pin='+encodeURIComponent(v),{redirect:'follow'}).then(x=>x.json());
+    if(!j.ok){toast(j.error==='PIN'?'Fel PIN-kod':'Kunde inte hämta: '+j.error);return;}
+    S.pin=v;save();tab='weeks';render();loadRemote();}
+  catch(e){toast('Kunde inte nå kalkylarket – kontrollera internet');}}
 // ======================= HÄNDELSER =======================
 const byKey=k=>items().find(i=>keyOf(i.address)===k);
-function go(t){tab=t;closeModal();render();scrollTo(0,0);}
+function go(t){tab=t;closeModal();render();scrollTo(0,0);if(t==='weeks')loadRemote();}
 document.addEventListener('change',e=>{
-  if(e.target.matches('[data-file]')&&e.target.files[0]){closeModal();importPdf(e.target.files[0]);e.target.value='';}
+  if(e.target.matches('[data-file]')&&e.target.files[0]){closeModal();importPdf(e.target.files[0],false);e.target.value='';}
+  if(e.target.matches('[data-upload]')&&e.target.files[0]){closeModal();importPdf(e.target.files[0],true);e.target.value='';}
   if(e.target.matches('[data-act=smart]')){S.showAll=!e.target.checked;save();render();}
   if(e.target.matches('[data-city]')){S.city=e.target.value.trim()||'Linköping';save();}
   if(e.target.matches('[data-syncurl]')){const u=e.target.value.trim();
@@ -721,6 +825,10 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
   switch(a){
     case 'house':openHouse(k);break;
+    case 'pinsubmit':submitPin();break;
+    case 'openlist':openList(t.dataset.p);break;
+    case 'refreshlists':loadRemote();break;
+    case 'forgetpin':S.pin='';save();render();toast('PIN-koden är borttagen från telefonen');break;
     case 'pickopen':modal(pickHTML(it));break;
     case 'probopen':modal(probHTML(it));break;
     case 'pick':{const n=+t.dataset.n;clearTimeout(noteT);setVill(it,n);markDone(it);touch(it);closeModal();render();
@@ -752,7 +860,7 @@ document.addEventListener('click',async e=>{
     case 'resetweek':modal(`<h3 style="margin-top:0">Nollställ veckans bockar?</h3><p class="muted">Rapporterat antal som vill ha reklam och kodproblem sparas.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="doresetweek">Nollställ</button></div>`);break;
     case 'doresetweek':S.week.done={};save();closeModal();render();toast('Nollställt');break;
     case 'wipe':modal(`<h3 style="margin-top:0">Radera allt?</h3><p class="muted">Listan och allt hon rapporterat i telefonen tas bort. Det går inte att ångra.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn warn" data-act="dowipe">Radera</button></div>`);break;
-    case 'dowipe':{const c=S.city,sy=S.sync.url;S=blank();S.city=c;S.sync.url=sy;save();closeModal();tab='map';render();break;}
+    case 'dowipe':{const c=S.city,sy=S.sync.url,pin=S.pin;S=blank();S.city=c;S.sync.url=sy;S.pin=pin;save();closeModal();tab='map';render();break;}
     case 'backup':try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Säkerhetskopia kopierad');}catch(_){modal(`<h3 style="margin-top:0">Säkerhetskopia</h3><textarea readonly style="min-height:160px">${esc(JSON.stringify(S))}</textarea><div class="row"><button class="btn" data-act="close">Stäng</button></div>`);}break;
     case 'restore':modal(`<h3 style="margin-top:0">Återställ säkerhetskopia</h3><textarea id="restoreTxt" style="min-height:140px" placeholder="Klistra in här"></textarea><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="dorestore">Återställ</button></div>`);break;
     case 'dorestore':try{const o=JSON.parse($('#restoreTxt').value);if(!o||typeof o!=='object'||!('houses' in o))throw 0;S=Object.assign(blank(),o);save();closeModal();fitted=false;render();toast('Återställt');}catch(_){toast('Ogiltig säkerhetskopia');}break;
@@ -771,7 +879,9 @@ function connectFromHash(){if(!location.hash.startsWith('#kalkylark='))return;co
   history.replaceState(null,'',location.pathname+location.search);
   if(/^https:\/\/script\.google\.com\/.+\/exec$/.test(u)){S.sync.url=u;save();syncUI();setTimeout(testSync,300);}}
 connectFromHash();addEventListener('hashchange',connectFromHash);
-render();syncUI();syncNow();if(S.route)geocodeAll(false);
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pinStart')submitPin();if(e.key==='Enter'&&e.target.id==='pinIn')$('[data-act=dopull]')?.click();});
+if(!S.route)tab=S.pin?'weeks':'pin';
+render();syncUI();syncNow();if(S.route)geocodeAll(false);if(S.pin)loadRemote();
 </script>
 </body>
 </html>

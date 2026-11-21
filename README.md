@@ -6,9 +6,11 @@ Appen: https://hamst90.github.io/utdelning/
 
 ## Så används den
 
-1. Spara veckans adresslista från utdelare.nu som PDF (Dela → Spara i Filer).
-2. Öppna appen i Safari, gå till **Lista** och välj PDF:en. Listan läses i telefonen – portkoderna lagras inte i det här repot.
-3. Lägg appen på hemskärmen: Dela → Lägg till på hemskärmen.
+1. Lägg appen på hemskärmen: öppna sidan i Safari → Dela → Lägg till på hemskärmen.
+2. Öppna appen och skriv PIN-koden. Då visas adresslistorna med status (pågår, kommande, klar).
+3. Nya listor: spara PDF:en från utdelare.nu i Drive-mappen *Utdelning – adresslistor*, eller tryck ☰ → Lägg upp ny lista i appen.
+
+Adresslistorna innehåller portkoder och lämnas bara ut av skriptet mot rätt PIN – de finns aldrig i det här repot.
 
 ## Funktioner
 

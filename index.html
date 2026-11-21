@@ -166,6 +166,7 @@ details.more summary{padding:8px 0;font-weight:600;color:var(--muted);cursor:poi
 .dock{z-index:1100}
 .modal{z-index:3000}
 #mapWrap{z-index:0;isolation:isolate}
+.pin.unsure{border:2px dashed #e9a23b}
 </style>
 </head>
 <body>
@@ -295,6 +296,7 @@ function flagsHTML(it){const h=hOf(it),st=status(it);let f='';
   if(st==='ejin')f+=`<span class="flag bad">Kom inte in i dag</span>`;
   if(skipReason(it)&&S.showAll)f+=`<span class="flag warn">Hoppas över i smart rutt</span>`;
   if(S.route&&S.geoDone&&!posOf(it))f+=`<span class="flag warn">Saknar plats på kartan</span>`;
+  else if(isUnsure(it))f+=`<span class="flag warn">Osäker plats på kartan – flytta nålen om den är fel</span>`;
   return f?`<div class="flags">${f}</div>`:'';}
 const wantLine=it=>{const h=hOf(it);return `${it.hh} hushåll · <span class="give">ge ut ${want(it)} ex</span>${h.vill==null?' <span class="muted">(ej rapporterat)</span>':''}`;};
 
@@ -420,7 +422,29 @@ $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();}
 
 // ======================= KARTA =======================
 let map=null,layer=null,me=null,meAcc=null,watchId=null,fitted=false,moveKey=null,lastMe=null;
-function posOf(it){const h=hOf(it);if(h.pos)return h.pos;const g=S.geo[geoKey(it.address)];return g||null;}
+function rawPos(it){const h=hOf(it);if(h.pos)return {p:h.pos,manual:true};const g=S.geo[geoKey(it.address)];return g?{p:g}:null;}
+function dist(a,b){const r=Math.PI/180,dy=(b[0]-a[0])*r,dx=(b[1]-a[1])*r*Math.cos(a[0]*r);return 6371000*Math.hypot(dx,dy);}
+// Adressökningen kan placera ett hus fel (t.ex. på fel del av gatan). Ett hus som ligger långt från
+// både grannarna i gångordningen och resten av distriktet markeras som osäkert och placeras mellan grannarna.
+let _unsure=null,_unsureKey='';
+function unsure(){
+  const key=S.updatedAt+'|'+(S.route&&S.route.importedAt);if(_unsure&&_unsureKey===key)return _unsure;
+  _unsureKey=key;_unsure={};if(!S.route)return _unsure;
+  const its=items(),raw=its.map(rawPos),pts=raw.filter(Boolean).map(r=>r.p);if(pts.length<5)return _unsure;
+  const md=a=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
+  const med=[md(pts.map(q=>q[0])),md(pts.map(q=>q[1]))];
+  const bad=new Set();
+  its.forEach((it,i)=>{const r=raw[i];if(!r||r.manual)return;
+    let prev=null,next=null;for(let j=i-1;j>=0;j--)if(raw[j]){prev=raw[j].p;break;}for(let j=i+1;j<its.length;j++)if(raw[j]){next=raw[j].p;break;}
+    const nb=[prev,next].filter(Boolean),dN=nb.length?Math.min(...nb.map(q=>dist(r.p,q))):0,dM=dist(r.p,med);
+    if(dM>800||(nb.length&&dN>300&&dM>250))bad.add(i);});
+  its.forEach((it,i)=>{if(!bad.has(i))return;
+    let prev=null,next=null;for(let j=i-1;j>=0;j--)if(raw[j]&&!bad.has(j)){prev=raw[j].p;break;}for(let j=i+1;j<its.length;j++)if(raw[j]&&!bad.has(j)){next=raw[j].p;break;}
+    const p=prev&&next?[(prev[0]+next[0])/2,(prev[1]+next[1])/2]:(prev||next);
+    if(p)_unsure[keyOf(it.address)]=[+p[0].toFixed(6),+p[1].toFixed(6)];});
+  return _unsure;}
+function posOf(it){const r=rawPos(it);if(!r)return null;if(r.manual)return r.p;const u=unsure()[keyOf(it.address)];return u||r.p;}
+const isUnsure=it=>!!unsure()[keyOf(it.address)];
 function geoKey(a){return keyOf(a)+'|'+keyOf(S.city);}
 function sizeMap(){const el=$('#map');if(!el)return;const top=el.getBoundingClientRect().top+scrollY;const dockH=document.body.classList.contains('has-dock')?$('#dock').offsetHeight:0;
   el.style.height=Math.max(300,innerHeight-top-dockH-10)+'px';if(map)map.invalidateSize();}
@@ -444,7 +468,7 @@ function drawMap(){
     const sk=p[0].toFixed(5)+','+p[1].toFixed(5);const n=seen[sk]=(seen[sk]||0)+1;
     if(n>1){const a=(n-1)*1.9,r=0.00006;p=[p[0]+r*Math.cos(a),p[1]+r*Math.sin(a)*1.9];}
     const state=pinState(it,it===nx);
-    const icon=L.divIcon({className:'',html:`<div class="pin ${state}"><span>${state==='done'?'✓':i+1}</span></div>`,iconSize:state==='next'?[38,38]:[30,30],iconAnchor:state==='next'?[19,38]:[15,30]});
+    const icon=L.divIcon({className:'',html:`<div class="pin ${state}${isUnsure(it)?' unsure':''}"><span>${state==='done'?'✓':i+1}</span></div>`,iconSize:state==='next'?[38,38]:[30,30],iconAnchor:state==='next'?[19,38]:[15,30]});
     const mk=L.marker(p,{icon,zIndexOffset:state==='next'?1000:(state==='skip'||state==='done'?-100:0)}).addTo(layer);
     mk.on('click',()=>{if(moveKey)return;openHouse(keyOf(it.address));});
     pts.push(p);
@@ -454,10 +478,14 @@ function drawMap(){
   if(!fitted&&pts.length){map.fitBounds(pts,{padding:[30,30]});fitted=true;}
   banner();}
 function panToNext(){const n=nextItem();if(n&&map&&posOf(n))map.panTo(posOf(n),{animate:true});}
+let bannerHidden=false;
 function banner(){const b=$('#mapBanner');let t='';
   if(moveKey)t='Tryck på kartan där <b>'+esc(byKey(moveKey)?.address||'')+'</b> ligger. <a href="#" data-act="movecancel">Avbryt</a>';
   else if(geoBusy)t=`Hittar adresserna på kartan… ${geoBusy.done} av ${geoBusy.total}`;
-  else if(S.route){const miss=items().filter(i=>!posOf(i));if(miss.length)t=`${miss.length} ${miss.length===1?'adress':'adresser'} hittades inte. Öppna dem i Rutt → <i>Flytta nålen på kartan</i>.`;}
+  else if(S.route){const miss=items().filter(i=>!posOf(i)),un=items().filter(isUnsure);
+    if(miss.length)t=`${miss.length} ${miss.length===1?'adress':'adresser'} hittades inte. Öppna dem i Rutt → <i>Flytta nålen på kartan</i>.`;
+    else if(un.length)t=`${un.map(i=>'nr '+nrOf(i)).join(', ')}: osäker plats, placerad mellan grannarna i rutten. Tryck på nålen → <i>Flytta nålen</i> om den är fel. <a href="#" data-act="bannerok">OK</a>`;}
+  if(bannerHidden&&!moveKey&&!geoBusy)t='';
   b.innerHTML=t;b.classList.toggle('hidden',!t);}
 function startGPS(){
   if(!navigator.geolocation||watchId!==null)return;
@@ -628,6 +656,7 @@ document.addEventListener('click',async e=>{
     case 'unskip':{const h=H(it);delete h.access;if(h.vill===0){h.zeroSince=S.week.no-CHECK_EVERY;}touch(it);render();toast('Tas med i rutten');break;}
     case 'move':closeModal();tab='map';render();moveKey=k;banner();toast('Tryck på kartan där huset ligger');break;
     case 'movecancel':moveKey=null;banner();break;
+    case 'bannerok':bannerHidden=true;banner();break;
     case 'menu':modal(menuHTML());break;
     case 'copy':try{await navigator.clipboard.writeText(reportText());toast('Rapporten är kopierad');}catch(_){selectReport();toast('Markera och kopiera texten');}break;
     case 'savefile':{const m=S.route.meta||{};const url=URL.createObjectURL(new Blob([reportText()],{type:'text/plain;charset=utf-8'}));const l=document.createElement('a');l.href=url;l.download=`rapport-${m.district||'distrikt'}-${m.period||''}.txt`;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);break;}

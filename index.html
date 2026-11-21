@@ -187,6 +187,15 @@ body{padding-top:calc(env(safe-area-inset-top) + 2px)}
 .flag.info{background:#e1ecf7;color:#1a5fa8}
 @media (prefers-color-scheme: dark){.flag.info{background:#1b2a3a;color:#8bb8ec}}
 .toolbar .btn.file{position:relative;overflow:hidden}
+.home{text-align:center;padding:48px 6px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;min-height:calc(100dvh - 40px)}
+.home .logo{font-size:56px;line-height:1}
+.home h1{font-size:30px;letter-spacing:-.02em;margin:0}
+.home p{margin:0 0 10px}
+.btn.hero{width:100%;max-width:420px;padding:20px;font-size:21px;border-radius:18px;flex-direction:column;gap:4px}
+.btn.hero small,.btn.hero2 small{font-size:14px;font-weight:500;opacity:.85}
+.btn.hero2{width:100%;max-width:420px;padding:15px;font-size:17px;border-radius:16px;flex-direction:column;gap:2px}
+.homelinks{display:flex;gap:18px;justify-content:center;margin-top:auto;padding-top:30px}
+.linkbtn{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:15px;padding:8px}
 </style>
 </head>
 <body>
@@ -200,7 +209,7 @@ body{padding-top:calc(env(safe-area-inset-top) + 2px)}
     <button class="iconbtn" data-act="menu" aria-label="Meny">☰</button>
   </div>
   <h1 class="hidden" id="plainTitle" style="margin:16px 0 12px"></h1>
-  <div class="backbar hidden" id="backbar"><button class="btn small" data-tab="map">‹ Tillbaka</button><b id="backTitle"></b></div>
+  <div class="backbar hidden" id="backbar"><button class="btn small" data-act="back">‹ Tillbaka</button><b id="backTitle"></b></div>
   <div id="mapWrap" class="hidden">
     <div id="map"></div>
     <div class="map-banner hidden" id="mapBanner"></div>
@@ -375,16 +384,17 @@ function render(){
   const skipN=all.filter(skipReason).length;
   $('#subtitle').textContent=has?`${doneN} av ${act.length} hus · ${ex} av ${exTot} ex`+(skipN?` · ${skipN} hoppas över`:''):'Ingen adresslista inläst';
   $('#bar').style.width=act.length?(100*doneN/act.length)+'%':'0';
-  if(!has&&(tab==='map'||tab==='route'))tab=S.pin?'weeks':'pin';
+  if(!has&&(tab==='map'||tab==='route'))tab='home';
   const main=tab==='map'||tab==='route';
   $('#tabs').classList.toggle('invisible',!has);$('#topbar').classList.toggle('hidden',!main);
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
-  $('#backbar').classList.toggle('hidden',main||(!has&&(tab==='weeks'||tab==='pin')));
+  $('#backbar').classList.toggle('hidden',main||tab==='home');
   $('#backTitle').textContent={report:'Rapport',setup:'Inställningar',weeks:'Adresslistor',pin:'PIN-kod'}[tab]||'';
-  $('#plainTitle').textContent=!has&&tab==='weeks'?'Adresslistor':'';$('#plainTitle').classList.toggle('hidden',!(!has&&tab==='weeks'));
+
   const showMap=has&&tab==='map';
   $('#mapWrap').classList.toggle('hidden',!showMap);
   const v=$('#view');
+  if(tab==='home'){v.innerHTML=homeHTML();dock(null);return;}
   if(tab==='pin'){v.innerHTML=pinHTML();dock(null);setTimeout(()=>$('#pinStart')?.focus(),50);return;}
   if(tab==='weeks'){v.innerHTML=weeksHTML();dock(null);return;}
   if(tab==='route')v.innerHTML=routeHTML(all,act);
@@ -471,6 +481,24 @@ function nextList(){const cur=S.week.period,cn=periodNo(cur)??-1;
     .sort((a,b)=>(periodNo(a)??0)-(periodNo(b)??0))[0]||null;}
 function weekFinished(){return S.route&&(S.week.closed||(active().length&&!active().some(i=>!status(i))));}
 const shortDate=meta=>{const d=listDate(meta);return d?d.toLocaleDateString('sv-SE',{day:'numeric',month:'short'}):'nästa';};
+// ---------- startsida ----------
+const started=()=>S.route&&!weekFinished()&&Object.keys(S.week.done).length>0;
+function startTarget(){ // vad "Starta utdelning" öppnar
+  if(S.route&&!weekFinished()&&!Object.keys(S.week.done).length)return S.week.period;
+  return nextList();}
+function homeHTML(){
+  const m=S.route&&S.route.meta,a=S.route?active():[],done=S.route?a.filter(status).length:0;
+  const tgt=startTarget(),tm=tgt&&S.lists[tgt]&&S.lists[tgt].meta;
+  const desc=meta=>esc((meta.date||'').replace(/\s*\(.*\)/,''))+(meta.district?' · distrikt '+esc(meta.district):'');
+  let b='';
+  if(started())b=`<button class="btn primary hero" data-act="resume">Återuppta utdelning<small>${desc(m)} · ${done} av ${a.length} hus klara</small></button>
+    <button class="btn hero2" data-act="startnew">Starta ny utdelning</button>`;
+  else b=`<button class="btn primary hero" data-act="startnew">Starta utdelning${tm?`<small>${desc(tm)}</small>`:''}</button>
+    ${S.route&&weekFinished()?`<button class="btn hero2" data-act="resume">Återuppta förra utdelningen<small>${desc(m)}</small></button>`:''}`;
+  return `<div class="home"><div class="logo">📬</div><h1>Reklamutdelning</h1>
+    <p class="muted">${S.route?'':'Välkommen! Tryck på knappen för att hämta veckans adresslista.'}</p>
+    ${b}
+    <div class="homelinks"><button class="linkbtn" data-go="weeks">Adresslistor</button>${S.route?'<button class="linkbtn" data-go="report">Rapport</button>':''}<button class="linkbtn" data-go="setup">Inställningar</button></div></div>`;}
 // ---------- husbladet (öppnas över kartan) ----------
 function houseHTML(it){
   const k=keyOf(it.address),h=hOf(it),st=status(it),v=h.vill??Math.min(1,it.hh);
@@ -515,6 +543,7 @@ function probHTML(it){const k=keyOf(it.address),h=hOf(it);
     <label class="lbl">Vad fungerade inte?</label>
     <div class="problist">${opts.map(([p,t])=>`<button class="btn block${h.access===p?' warn':''}" data-act="probpick" data-p="${p}" data-k="${esc(k)}">${t}</button>`).join('')}</div>`;}
 function menuHTML(){return `<div class="grab"></div><div class="sheet-head"><div class="addr big">Meny</div><button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
+  <button class="menuitem" data-go="home"><span>🏠</span><div><b>Startsida</b><div class="muted">Starta eller återuppta utdelning</div></div></button>
   <button class="menuitem" data-go="weeks"><span>🗓</span><div><b>Adresslistor</b><div class="muted">Byt vecka – pågående, kommande och klara</div></div></button>
   <label class="menuitem file"><span>⬆︎</span><div><b>Lägg upp ny lista</b><div class="muted">Välj PDF:en – den sparas i Drive så att alla ser den</div></div><input type="file" accept="application/pdf,.pdf" data-upload></label>
   ${S.route&&!S.week.closed?`<button class="menuitem" data-act="closeweek"><span>🏁</span><div><b>Avsluta utdelningen</b><div class="muted">När du är klar – även om alla adresser inte är besökta</div></div></button>`:''}
@@ -820,7 +849,7 @@ async function loadRemote(){
     const fresh=j.files.filter(f=>!before.has(f.id)&&S.fileMap[f.id]&&S.fileMap[f.id]!==S.week.period);
     if(fresh.length&&S.route&&tab!=='weeks')toast(`${fresh.length===1?'En ny adresslista':fresh.length+' nya adresslistor'} – ☰ → Adresslistor`);
   }catch(e){remoteErr=String(e.message||e);}
-  remoteBusy=false;if(tab==='weeks'||weekFinished())render();}
+  remoteBusy=false;if(tab==='weeks'||tab==='home'||weekFinished())render();}
 function weekStatus(per){
   const L=S.lists[per];if(!L)return {label:'',cls:''};
   const w=per===S.week.period?S.week:(S.weeks[per]||{done:{}});
@@ -857,11 +886,11 @@ function pinHTML(){return `<div class="empty"><h2>Utdelningsrutt</h2><p>Skriv PI
 async function submitPin(){const v=($('#pinStart')?.value||'').trim();if(!v){toast('Skriv PIN-koden');return;}
   try{const j=await fetch(syncURL()+'?action=lists&pin='+encodeURIComponent(v),{redirect:'follow'}).then(x=>x.json());
     if(!j.ok){toast(j.error==='PIN'?'Fel PIN-kod':'Kunde inte hämta: '+j.error);return;}
-    S.pin=v;save();tab='weeks';render();loadRemote();}
+    S.pin=v;save();tab='weeks';render();await loadRemote();const tg=startTarget();if(tg&&tg!==S.week.period&&tab==='weeks')openList(tg);}
   catch(e){toast('Kunde inte nå kalkylarket – kontrollera internet');}}
 // ======================= HÄNDELSER =======================
 const byKey=k=>items().find(i=>keyOf(i.address)===k);
-function go(t){tab=t;closeModal();render();scrollTo(0,0);if(t==='weeks')loadRemote();}
+function go(t){if((t==='weeks')&&!S.pin)t='pin';tab=t;closeModal();render();scrollTo(0,0);if(t==='weeks')loadRemote();}
 document.addEventListener('change',e=>{
   if(e.target.matches('[data-file]')&&e.target.files[0]){closeModal();importPdf(e.target.files[0],false);e.target.value='';}
   if(e.target.matches('[data-upload]')&&e.target.files[0]){closeModal();importPdf(e.target.files[0],true);e.target.value='';}
@@ -883,6 +912,9 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
   switch(a){
     case 'house':openHouse(k);break;
+    case 'resume':if(S.week.closed){S.week.closed=null;for(const i of active().filter(i=>!status(i)))touch(i);save();}tab='map';render();break;
+    case 'startnew':{const tg=startTarget();if(tg){if(tg===S.week.period){tab='map';render();}else openList(tg);}else{go(S.pin?'weeks':'pin');if(S.pin)toast('Välj vilken adresslista du vill dela ut');}break;}
+    case 'back':tab=(tab==='weeks'||tab==='pin'||!S.route)?'home':'map';render();scrollTo(0,0);break;
     case 'reverse':S.week.dir=S.week.dir===-1?1:-1;save();closeModal();render();if(tab==='map')panToNext();{const n=nextItem();toast('Rutten är vänd'+(n?' – nästa: '+n.address:''));}break;
     case 'closeweek':{const left=active().filter(i=>!status(i)).length;
       modal(`<h3 style="margin-top:0">Avsluta utdelningen?</h3><p class="muted">${left?`<b>${left} ${left===1?'adress är':'adresser är'} inte besökta.</b> De markeras som ”Ej besökt” i rapporten och kalkylarket. Det hon rapporterat om husen påverkas inte.`:'Alla adresser är besökta.'}</p><p class="muted">Du kan öppna utdelningen igen om du ångrar dig.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="doclose">Avsluta</button></div>`);break;}
@@ -944,9 +976,7 @@ function connectFromHash(){if(!location.hash.startsWith('#kalkylark='))return;co
   if(/^https:\/\/script\.google\.com\/.+\/exec$/.test(u)){S.sync.url=u;save();syncUI();setTimeout(testSync,300);}}
 connectFromHash();addEventListener('hashchange',connectFromHash);
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pinStart')submitPin();if(e.key==='Enter'&&e.target.id==='pinIn')$('[data-act=dopull]')?.click();});
-if(!S.route)tab=S.pin?'weeks':'pin';
-// Är förra utdelningen klar och en ny lista finns? Börja på adresslistorna.
-else if(weekFinished()&&nextList())tab='weeks';
+tab='home';
 render();syncUI();syncNow();if(S.route)geocodeAll(false);if(S.pin)loadRemote();
 </script>
 </body>

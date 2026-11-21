@@ -589,9 +589,10 @@ function selectReport(){const el=$('#reportText');if(!el)return;const r=document
 
 load();
 // Kopplingslänk: …/utdelning/#kalkylark=<webbappslänk> sparar länken och tar bort den ur adressfältet
-if(location.hash.startsWith('#kalkylark=')){const u=decodeURIComponent(location.hash.slice(11));
+function connectFromHash(){if(!location.hash.startsWith('#kalkylark='))return;const u=decodeURIComponent(location.hash.slice(11));
   history.replaceState(null,'',location.pathname+location.search);
-  if(/^https:\/\/script\.google\.com\/.+\/exec$/.test(u)){S.sync.url=u;save();setTimeout(testSync,300);}}
+  if(/^https:\/\/script\.google\.com\/.+\/exec$/.test(u)){S.sync.url=u;save();syncUI();setTimeout(testSync,300);}}
+connectFromHash();addEventListener('hashchange',connectFromHash);
 render();syncUI();syncNow();if(S.route)geocodeAll(false);
 </script>
 </body>

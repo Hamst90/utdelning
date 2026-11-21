@@ -6,6 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Utdelningsrutt</title>
 <meta name="apple-mobile-web-app-title" content="Utdelning">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <meta name="theme-color" content="#1f5f4a">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -196,6 +201,8 @@ body{padding-top:calc(env(safe-area-inset-top) + 2px)}
 .btn.hero2{width:100%;max-width:420px;padding:15px;font-size:17px;border-radius:16px;flex-direction:column;gap:2px}
 .homelinks{display:flex;gap:18px;justify-content:center;margin-top:auto;padding-top:30px}
 .linkbtn{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:15px;padding:8px}
+.a2hs{max-width:420px;width:100%;text-align:left;font-size:14px;background:var(--info-soft);border-radius:14px;padding:12px 14px;margin-top:6px}
+.a2hs b{display:block;margin-bottom:2px}
 </style>
 </head>
 <body>
@@ -482,6 +489,8 @@ function nextList(){const cur=S.week.period,cn=periodNo(cur)??-1;
 function weekFinished(){return S.route&&(S.week.closed||(active().length&&!active().some(i=>!status(i))));}
 const shortDate=meta=>{const d=listDate(meta);return d?d.toLocaleDateString('sv-SE',{day:'numeric',month:'short'}):'nästa';};
 // ---------- startsida ----------
+const isStandalone=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+const isIOS=()=>/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const started=()=>S.route&&!weekFinished()&&Object.keys(S.week.done).length>0;
 function startTarget(){ // vad "Starta utdelning" öppnar
   if(S.route&&!weekFinished()&&!Object.keys(S.week.done).length)return S.week.period;
@@ -498,6 +507,7 @@ function homeHTML(){
   return `<div class="home"><div class="logo">📬</div><h1>Reklamutdelning</h1>
     <p class="muted">${S.route?'':'Välkommen! Tryck på knappen för att hämta veckans adresslista.'}</p>
     ${b}
+    ${isIOS()&&!isStandalone()?`<div class="a2hs"><b>Tips: gör den till en app utan adressfält</b>Tryck på dela-knappen <span aria-hidden="true">⎙</span> i Safari → <b style="display:inline">Lägg till på hemskärmen</b>, och öppna sedan appen från ikonen. Första gången där skriver du PIN-koden igen.</div>`:''}
     <div class="homelinks"><button class="linkbtn" data-go="weeks">Adresslistor</button>${S.route?'<button class="linkbtn" data-go="report">Rapport</button>':''}<button class="linkbtn" data-go="setup">Inställningar</button></div></div>`;}
 // ---------- husbladet (öppnas över kartan) ----------
 function houseHTML(it){

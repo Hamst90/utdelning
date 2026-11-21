@@ -172,6 +172,8 @@ details.more summary{padding:8px 0;font-weight:600;color:var(--muted);cursor:poi
 .topbar .iconbtn{height:46px;width:46px}
 .invisible{visibility:hidden}
 body{padding-top:calc(env(safe-area-inset-top) + 2px)}
+.dinfo{font-size:14px;line-height:1.35;margin-top:6px;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.dock .chips{gap:6px}
 </style>
 </head>
 <body>
@@ -247,6 +249,31 @@ function parseRouteItems(pages){
   for(const it of items){it.notes=[it.notes.join(' ').replace(/\s+/g,' ').trim()].filter(Boolean);}
   return {meta,items};
 }
+// Plockar ut den svenska delen ur arbetsgivarens tvåspråkiga anteckningar.
+const EN_WORDS=new Set('the to at use door gate enter yard yardside box boxes behind floor only your on in copies put keep marked elevator don dont miss distribution code left right arch street distance some second first third fourth fifth postboxes letterslit open until untill with between works for inner private digit press parking house corner entrance entrences side plank outside furth throu then walk you ll have is are stop stops bike stand wall not one look accessnotes from of and it straight forward reaches common passage adresses addresses too keytag when'.split(' '));
+const SV_WORDS=new Set('och till på i med vid gå in ut gården grind koden kod porten dörr dörren inkast lägg ex låda bakom vån hissen bara inte som är för har du finns längst vägen valvet höger vänster märkt genom ej dela öppen öppet brickan går också inre trappa bredvid infart bilar använd koddosan postboxar våning rakt fram endast se ovanpå parkeringshuset ingång hörnet välj en bit från brevinkast brevlåda innanför planket bron tomtgräns den gånggrind'.split(' '));
+function score(t){const w=(t.toLowerCase().match(/[a-zåäö]+/g)||[]);let en=0,sv=0;
+  for(const x of w){if(/[åäö]/.test(x)||SV_WORDS.has(x))sv++;else if(EN_WORDS.has(x))en++;}return {en,sv};}
+const isEnglish=t=>{const s=score(t);return s.en>s.sv&&s.en>=1;};
+function svText(s){
+  if(!s)return '';
+  const sentences=s.replace(/\s+/g,' ').split(/(?<=[.!?])\s*(?=\S)|\s+(?=(?:The|Enter|Use|Put|Keep|Only|Postboxes|Above|Code|Look|Behind|Box|Boxes|Door|Gate|Yardside|Entrance|Entrences|In the|Don't)\b)/);
+  const out=[],seen=new Set();
+  for(const sen of sentences){
+    const parts=sen.split('/').map(x=>x.trim()).filter(Boolean);
+    const anyEn=parts.some(isEnglish);const keep=[];
+    parts.forEach((x,i)=>{
+      if(isEnglish(x)){ // svensk mening som slutar på "till"/"med" fick sitt värde i den engelska delen (t.ex. "Öppet till / Open until 14:00")
+        const prev=keep[keep.length-1];const m=x.match(/(\d{1,2}[:.]\d{2}|\d+\s?[A-ZÅÄÖ]{0,3})\.?$/);
+        if(prev&&m&&/\b(till|med|vid|kl\.?)$/i.test(prev.t))prev.t+=' '+m[1];
+        return;}
+      if(anyEn&&score(x).sv===0)return; // neutral rest (t.ex. ett gatunamn) i en engelsk mening
+      keep.push({t:x});});
+    const txt=keep.map(k=>k.t).join(' / ');const norm=txt.toLowerCase().replace(/[.\s]+$/,'');
+    if(txt&&!seen.has(norm)){seen.add(norm);out.push(txt);}}
+  return out.join(' ').replace(/\s+([.,])/g,'$1').trim();}
+function stripLabel(g){const i=g.indexOf(': ');return i>0&&i<45&&/\d/.test(g.slice(0,i))?g.slice(i+2):g;}
+
 </script>
 <script type="module">
 // ======================= Utdelningsrutt =======================
@@ -301,6 +328,9 @@ function flagsHTML(it){const h=hOf(it),st=status(it);let f='';
   if(S.route&&S.geoDone&&!posOf(it))f+=`<span class="flag warn">Saknar plats på kartan</span>`;
   else if(isUnsure(it))f+=`<span class="flag warn">Osäker plats på kartan – flytta nålen om den är fel</span>`;
   return f?`<div class="flags">${f}</div>`:'';}
+function infoParts(it){const g=it.group?svText(stripLabel(it.group)):'',n=svText(it.notes.join(' '));
+  return {g:g&&!(n&&n.includes(g))?g:'',n};}
+function infoText(it){const p=infoParts(it);return [p.g,p.n].filter(Boolean).join(' ');}
 const wantLine=it=>{const h=hOf(it);return `${it.hh} hushåll · <span class="give">ge ut ${want(it)} ex</span>${h.vill==null?' <span class="muted">(ej rapporterat)</span>':''}`;};
 
 // ---------- render ----------
@@ -340,7 +370,7 @@ function cardHTML(it,isNext){
       <div class="cbody"><div class="addr">${esc(it.address)}</div>
         <div class="meta">${wantLine(it)}</div>
         ${chipsHTML(it)}${flagsHTML(it)}
-        ${(it.group||it.notes.length)?`<div class="peek">ℹ︎ ${esc((it.notes[0]||it.group).split('/')[0])}</div>`:''}</div>
+        ${infoText(it)?`<div class="peek">📍 ${esc(infoText(it))}</div>`:''}</div>
     </button>`;}
 function routeHTML(all,act){
   const nx=nextItem(),remaining=act.filter(i=>!status(i));
@@ -388,7 +418,7 @@ function dock(it){const d=$('#dock');
   const k=keyOf(it.address);
   $('#dockInner').innerHTML=`<button class="what" data-act="house" data-k="${esc(k)}">
       <div class="meta">Nästa · nr ${nrOf(it)} · ${wantLine(it)}</div>
-      <div class="addr">${esc(it.address)}</div>${chipsHTML(it)}</button>
+      <div class="addr">${esc(it.address)}</div>${chipsHTML(it)}${infoText(it)?`<div class="dinfo">📍 ${esc(infoText(it))}</div>`:''}</button>
     <div class="dbtns"><button class="btn" data-act="house" data-k="${esc(k)}">Rapportera</button><button class="btn primary" data-act="done" data-k="${esc(k)}">Klar ✓</button></div>`;}
 
 // ---------- husbladet (öppnas över kartan) ----------
@@ -398,8 +428,7 @@ function houseHTML(it){
     <div class="sheet-head"><div><div class="meta">nr ${nrOf(it)}</div><div class="addr big">${esc(it.address)}</div><div class="meta">${wantLine(it)}</div></div>
       <button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
     ${chipsHTML(it)}${flagsHTML(it)}
-    ${it.group?`<div class="note">${esc(it.group)}</div>`:''}
-    ${it.notes.length?`<div class="note plain">${esc(it.notes.join(' '))}</div>`:''}
+    ${(()=>{const p=infoParts(it);return (p.g?`<div class="note">📍 ${esc(p.g)}</div>`:'')+(p.n?`<div class="note plain">${esc(p.n)}</div>`:'');})()}
     <label class="lbl">Hur många av ${it.hh} hushåll vill ha reklam?</label>
     <div class="stepper"><button data-act="v-" data-k="${esc(k)}" aria-label="Minska">−</button><output>${v}</output><button data-act="v+" data-k="${esc(k)}" aria-label="Öka">+</button>
       <span class="muted" style="font-size:13px">${h.vill==null?'inte sparat än':''}</span></div>

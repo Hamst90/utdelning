@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Utdelningsrutt</title>
+<meta name="apple-mobile-web-app-title" content="Utdelning">
+<meta name="theme-color" content="#1f5f4a">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+:root{
+  --bg:#f4f2ee; --card:#ffffff; --ink:#1d1b18; --muted:#6f6a62; --line:#e3dfd8;
+  --accent:#1f5f4a; --accent-ink:#ffffff; --accent-soft:#e3efe9;
+  --warn:#b4541c; --warn-soft:#fbeadf; --bad:#a3262a; --bad-soft:#f8e1e1;
+  --info-soft:#f6f0dc; --code:#24211d;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#141412; --card:#1f1e1b; --ink:#f1eee8; --muted:#a39d93; --line:#33312c;
+    --accent:#4fb08c; --accent-ink:#0d1f18; --accent-soft:#1d332a;
+    --warn:#f0965a; --warn-soft:#3a2618; --bad:#f07a7d; --bad-soft:#3a1c1d; --info-soft:#2e2a1d; --code:#f1eee8; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 110px) env(safe-area-inset-left)}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+a{color:var(--accent)}
+.wrap{max-width:640px;margin:0 auto;padding:0 14px}
+header{padding:16px 0 8px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:14px;margin-top:2px}
+.sync{font-size:12px;color:var(--muted);margin-top:4px}
+.progress{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:12px 0 4px}
+.progress>i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.stats{display:flex;gap:14px;font-size:14px;color:var(--muted);flex-wrap:wrap}
+.stats b{color:var(--ink)}
+nav.tabs{display:flex;gap:6px;margin:14px 0 10px;background:var(--line);padding:4px;border-radius:12px}
+nav.tabs button{flex:1;border:0;background:transparent;padding:9px 6px;border-radius:9px;font-weight:600;font-size:15px;color:var(--muted)}
+nav.tabs button[aria-selected=true]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.toolbar{display:flex;gap:8px;align-items:center;margin:4px 0 12px;flex-wrap:wrap}
+.toggle{display:flex;align-items:center;gap:8px;font-size:14px;background:var(--card);border:1px solid var(--line);padding:8px 12px;border-radius:99px}
+.toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.btn{border:1px solid var(--line);background:var(--card);padding:10px 14px;border-radius:12px;font-weight:600;font-size:15px;text-decoration:none;color:var(--ink);display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.warn{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.btn.small{padding:7px 11px;font-size:14px;border-radius:10px}
+.btn.block{width:100%}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.card.done{opacity:.55}
+.card.next{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.card-head{display:flex;gap:12px;padding:12px 14px;align-items:flex-start;width:100%;text-align:left;border:0;background:transparent}
+.ord{min-width:34px;height:34px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.card.done .ord{background:var(--accent);color:var(--accent-ink)}
+.addr{font-weight:700;font-size:17px;line-height:1.25}
+.meta{font-size:13px;color:var(--muted);margin-top:2px}
+.give{font-weight:700;color:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{font:600 15px/1 ui-monospace,"SF Mono",Menlo,monospace;background:var(--bg);border:1px solid var(--line);color:var(--code);padding:7px 9px;border-radius:8px}
+.chip small{font:500 11px/1 -apple-system,sans-serif;color:var(--muted);margin-right:5px;text-transform:uppercase;letter-spacing:.04em}
+.chip.miss{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.chip.plain{font-family:inherit;font-size:13px}
+.flag{display:inline-block;font-size:12px;font-weight:700;padding:3px 7px;border-radius:6px;margin-top:6px;margin-right:4px}
+.flag.bad{background:var(--bad-soft);color:var(--bad)}
+.flag.warn{background:var(--warn-soft);color:var(--warn)}
+.flag.ok{background:var(--accent-soft);color:var(--accent)}
+.body{padding:0 14px 14px}
+.note{font-size:14px;background:var(--info-soft);border-radius:10px;padding:9px 11px;margin:8px 0}
+.note.plain{background:var(--bg)}
+.row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.row>.btn{flex:1}
+.section-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 8px}
+.stepper{display:flex;align-items:center;gap:10px;margin-top:6px}
+.stepper button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--bg);font-size:22px;font-weight:600}
+.stepper output{font-size:22px;font-weight:700;min-width:36px;text-align:center}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.opt{border:1px solid var(--line);background:var(--bg);padding:9px 12px;border-radius:10px;font-size:14px;font-weight:600}
+.opt[aria-pressed=true]{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.opt.good[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+textarea,input[type=text]{width:100%;font:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+textarea{min-height:70px;resize:vertical}
+label.lbl{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 4px}
+.skipped{border:1px dashed var(--line);border-radius:var(--r);padding:4px 14px 10px;margin-top:16px}
+.skipped summary{padding:10px 0;font-weight:600;color:var(--muted);cursor:pointer}
+.skip-item{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px;align-items:center}
+.empty{text-align:center;padding:40px 10px}
+.empty h2{margin:0 0 8px;font-size:20px}
+.empty p{color:var(--muted);margin:0 0 18px}
+.file{position:relative;overflow:hidden}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+ol.howto{text-align:left;color:var(--muted);font-size:14px;padding-left:20px;margin:18px auto 0;max-width:420px}
+pre.report{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;font:14px/1.45 ui-monospace,"SF Mono",Menlo,monospace;margin:0}
+.dock{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+.dock .in{max-width:640px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.dock .what{flex:1;min-width:0}
+.dock .what .addr{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:16px}
+.dock .what .meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-size:14px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.toast.show{opacity:1}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:30}
+.modal.open{display:flex}
+.modal .sheet{background:var(--card);width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+.muted{color:var(--muted)}
+.hidden{display:none!important}
+.peek{font-size:13px;color:var(--muted);margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#mapWrap{position:relative;margin-bottom:10px}
+#map{height:calc(100dvh - 330px);min-height:360px;border-radius:var(--r);border:1px solid var(--line);overflow:hidden;background:var(--line)}
+.map-tools{position:absolute;right:10px;top:10px;z-index:500;display:flex;flex-direction:column;gap:8px}
+.map-tools .btn{box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.map-banner{position:absolute;left:10px;right:70px;top:10px;z-index:500;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);background:#fff}
+.pin span{transform:rotate(45deg);font:700 12px/1 -apple-system,sans-serif;color:#1d1b18}
+.pin.todo{background:#ffffff}
+.pin.next{background:#1f5f4a;width:38px;height:38px}.pin.next span{color:#fff;font-size:14px}
+.pin.done{background:#7fb59c}.pin.done span{color:#fff}
+.pin.ejin{background:#a3262a}.pin.ejin span{color:#fff}
+.pin.skip{background:#b9b4ab;opacity:.75}
+.pin.check{background:#e9a23b}
+.me-dot{width:16px;height:16px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 2px rgba(26,115,232,.35)}
+.leaflet-popup-content{margin:12px 14px;font:14px/1.4 -apple-system,sans-serif;min-width:190px}
+.leaflet-popup-content .addr{font-size:16px}
+.leaflet-popup-content .row{margin-top:8px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 2px 12px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.2)}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="title">Utdelningsrutt</h1>
+    <div class="sub" id="subtitle">Ingen adresslista inläst</div>
+    <div class="progress"><i id="bar"></i></div>
+    <div class="stats" id="stats"></div>
+  </header>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="route" aria-selected="true">Rutt</button>
+    <button role="tab" data-tab="map" aria-selected="false">Karta</button>
+    <button role="tab" data-tab="report" aria-selected="false">Rapport</button>
+    <button role="tab" data-tab="setup" aria-selected="false">Lista</button>
+  </nav>
+  <div id="mapWrap" class="hidden">
+    <div id="map"></div>
+    <div class="map-banner hidden" id="mapBanner"></div>
+    <div class="map-tools">
+      <button class="btn small" id="btnMe" aria-label="Min position">◎ Jag</button>
+      <button class="btn small" id="btnFit" aria-label="Visa hela rutten">⤢ Allt</button>
+    </div>
+  </div>
+  <div class="legend hidden" id="legend"><span><i style="background:#1f5f4a"></i>Nästa</span><span><i style="background:#fff"></i>Kvar</span><span><i style="background:#7fb59c"></i>Klar</span><span><i style="background:#a3262a"></i>Kom inte in</span><span><i style="background:#e9a23b"></i>Kontrollera</span><span><i style="background:#b9b4ab"></i>Hoppas över</span></div>
+  <main id="view"></main>
+</div>
+<div class="dock hidden" id="dock"><div class="in">
+  <div class="what"><div class="meta">Nästa</div><div class="addr" id="dockAddr"></div><div class="meta" id="dockMeta"></div></div>
+  <button class="btn small" id="dockMap">Karta</button>
+  <button class="btn primary" id="dockDone">Klar ✓</button>
+</div></div>
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<script>
+// Shared parser: takes array of pages, each array of {str,x,y,w}; returns {meta, items}
+function isGroupStart(t){const i=t.indexOf(': ');if(i<0)return false;const b=t.slice(0,i);return b.length<45&&/\d/.test(b)&&!/^(Dörrkod|Använd|Kod)/i.test(b);}
+function streetOf(a){return a.replace(/\s+\d+.*$/,'').trim().toLowerCase();}
+function parseRouteItems(pages){
+  const lines=[];
+  pages.forEach((items,pi)=>{
+    const its=items.filter(i=>i.str.trim()).sort((a,b)=>b.y-a.y||a.x-b.x);
+    const pl=[];
+    for(const it of its){
+      let ln=pl.find(l=>Math.abs(l.y-it.y)<=4);
+      if(!ln){ln={y:it.y,page:pi,items:[]};pl.push(ln);}
+      ln.items.push(it);
+    }
+    pl.sort((a,b)=>b.y-a.y);
+    lines.push(...pl);
+  });
+  const join=arr=>{arr.sort((a,b)=>a.x-b.x);let s='',end=null;for(const it of arr){if(end!==null&&it.x-end>1.5&&!s.endsWith(' ')&&!it.str.startsWith(' '))s+=' ';s+=it.str;end=it.x+it.w;}return s.replace(/\s+/g,' ').trim();};
+  const meta={};const items=[];let cur=null;let pendingGroup=[];
+  for(const ln of lines){
+    const left=ln.items.filter(i=>i.x<110&&/^\d+$/.test(i.str.trim()));
+    const right=ln.items.filter(i=>i.x>440&&/^\d+$/.test(i.str.trim()));
+    const mid=ln.items.filter(i=>!left.includes(i)&&!right.includes(i));
+    const text=join(mid);
+    if(left.length&&mid.length){
+      cur={hh:parseInt(left[0].str,10),order:right.length?parseInt(right[0].str,10):null,address:text,codes:[],tags:[],fbox:false,notes:[],group:pendingGroup.join(' ')};
+      pendingGroup=[];items.push(cur);continue;
+    }
+    if(!text)continue;
+    let m;
+    if((m=text.match(/^Distrikt\s+(.+)$/)))meta.district=m[1];
+    else if((m=text.match(/^Adresser på distriktet:\s*(\d+)/)))meta.total=+m[1];
+    else if((m=text.match(/^Adresser som ska delas ut:\s*(\d+)/)))meta.toDeliver=+m[1];
+    else if((m=text.match(/Period\s+(\d+)/))){meta.period=m[1];meta.date=text;}
+    else if(/^(ANTAL|HUSH|KATEGORI|ADRESS|GÅNGORDNING)/.test(text)||/^ANTAL/.test(text)){}
+    else if(pendingGroup.length||isGroupStart(text)||(!cur)){pendingGroup.push(text);}
+    else if((m=text.match(/^Dörrkod:\s*(.+)$/)))cur.codes.push(m[1]);
+    else if((m=text.match(/^Använd nyckelbricka:\s*(.+)$/)))cur.tags.push(m[1]);
+    else if(/^Fastighetsbox$/.test(text))cur.fbox=true;
+    else cur.notes.push(text);
+  }
+  if(pendingGroup.length&&cur)cur.notes.push(pendingGroup.join(' '));
+  // spread group notes to following addresses on the same street whose number is named in the label
+  for(let k=0;k<items.length;k++){const g=items[k].group;if(!g)continue;const label=g.slice(0,g.indexOf(': ')>0?g.indexOf(': '):g.length);const nums=(label.match(/\d+/g)||[]);
+    for(let j=k+1;j<items.length&&!items[j].group;j++){const a=items[j].address;const n=(a.match(/\s(\d+)/)||[])[1];if(label.toLowerCase().includes(streetOf(a))&&nums.includes(n))items[j].group=g;else break;}}
+  // merge wrapped note lines: join consecutive into one string
+  for(const it of items){it.notes=[it.notes.join(' ').replace(/\s+/g,' ').trim()].filter(Boolean);}
+  return {meta,items};
+}
+</script>
+<script type="module">
+// ======================= Utdelningsrutt =======================
+const LS='utdelning.v2';
+const CHECK_EVERY=8; // kontrollrunda: veckor mellan besök hos hus där ingen vill ha reklam
+const PROBLEMS={kod:'Koden fungerar inte',tagg:'Taggen fungerar inte',last:'Låst / grind stängd',saknas:'Kod saknas',annat:'Annat problem'};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const keyOf=a=>a.toLowerCase().replace(/\s+/g,' ').trim();
+const missing=c=>/\?{2,}/.test(c);
+const idOf=k=>'c-'+k.replace(/[^a-z0-9åäö]/g,'_');
+
+function blank(){return {v:2,updatedAt:0,city:'Linköping',route:null,houses:{},week:{period:null,no:0,done:{}},showAll:false,geo:{}};}
+let S=blank();
+function load(){try{const j=localStorage.getItem(LS);if(j)S=Object.assign(blank(),JSON.parse(j));}catch(e){}}
+function save(){S.updatedAt=Date.now();try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){toast('Kunde inte spara i telefonen');}}
+let tab='route',open=null;
+
+// ---------- modell ----------
+const items=()=>S.route?S.route.items.slice().sort((a,b)=>(a.order??0)-(b.order??0)):[];
+const H=it=>S.houses[keyOf(it.address)]||(S.houses[keyOf(it.address)]={});
+const hOf=it=>S.houses[keyOf(it.address)]||{};
+const status=it=>S.week.done[keyOf(it.address)]||null;
+function want(it){const h=hOf(it);return h.vill==null?it.hh:Math.min(h.vill,it.hh);}
+function checkDue(it){const h=hOf(it);return h.vill===0&&(h.hhChanged||(S.week.no-(h.zeroSince??S.week.no))>=CHECK_EVERY);}
+function skipReason(it){
+  if(status(it))return null;
+  const h=hOf(it);
+  if(h.vill===0&&!checkDue(it))return 'Ingen vill ha reklam';
+  if(h.access&&!h.newCode)return 'Kom inte in: '+PROBLEMS[h.access].toLowerCase();
+  return null;}
+const active=()=>items().filter(i=>S.showAll||!skipReason(i));
+const nextItem=()=>active().find(i=>!status(i));
+function setVill(it,v){const h=H(it);v=Math.max(0,Math.min(it.hh,v));if(v===0&&h.vill!==0)h.zeroSince=S.week.no;if(v===0&&checkDue(it))h.zeroSince=S.week.no;h.vill=v;delete h.hhChanged;}
+function markDone(it){const k=keyOf(it.address),h=H(it);S.week.done[k]='klar';delete h.access;delete h.newCode;delete h.hhChanged;if(h.vill===0)h.zeroSince=S.week.no;}
+
+// ---------- kartlänkar ----------
+const mapsURL=it=>{const p=posOf(it);return p?`https://maps.apple.com/?daddr=${p[0]},${p[1]}&dirflg=w`:'https://maps.apple.com/?daddr='+encodeURIComponent(it.address+', '+S.city)+'&dirflg=w';};
+
+// ---------- render ----------
+function render(){
+  const all=items(),act=active(),m=S.route&&S.route.meta||{};
+  $('#title').textContent=m.district?'Distrikt '+m.district:'Utdelningsrutt';
+  $('#subtitle').textContent=S.route?(m.date||'')+' · '+all.length+' adresser':'Ingen adresslista inläst';
+  const doneN=act.filter(status).length;
+  $('#bar').style.width=act.length?(100*doneN/act.length)+'%':'0';
+  const ex=act.filter(i=>status(i)==='klar').reduce((s,i)=>s+want(i),0),exTot=act.reduce((s,i)=>s+want(i),0);
+  const skipN=all.filter(skipReason).length;
+  $('#stats').innerHTML=S.route?`<span><b>${doneN}</b> av ${act.length} hus</span><span><b>${ex}</b> av ${exTot} ex</span>`+(skipN?`<span><b>${skipN}</b> hoppas över</span>`:''):'';
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
+  const v=$('#view'),showMap=tab==='map'&&S.route;
+  $('#mapWrap').classList.toggle('hidden',!showMap);$('#legend').classList.toggle('hidden',!showMap);
+  if(!S.route&&tab!=='setup'){v.innerHTML=emptyHTML();dock(null);return;}
+  if(tab==='route')v.innerHTML=routeHTML(all,act);
+  else if(tab==='map')v.innerHTML='';
+  else if(tab==='report')v.innerHTML=reportHTML();
+  else v.innerHTML=setupHTML();
+  dock(tab==='route'||tab==='map'?nextItem():null);
+  if(showMap)drawMap();
+}
+function emptyHTML(){return `<div class="empty"><h2>Läs in veckans adresslista</h2><p>Välj PDF:en från utdelare.nu. Listan läses direkt i telefonen – portkoderna skickas ingenstans.</p>
+  <label class="btn primary file">Välj PDF…<input type="file" accept="application/pdf,.pdf" data-file></label>
+  <ol class="howto"><li>Logga in på utdelare.nu och öppna adresslistan.</li><li>Tryck på dela-knappen → <b>Spara i Filer</b>.</li><li>Kom tillbaka hit och välj filen.</li></ol></div>`;}
+function chipsHTML(it){let c='';
+  for(const k of it.codes){const mm=k.match(/^(Grind|Port);\s*(.+)$/);const lbl=mm?mm[1]:'Kod',val=mm?mm[2]:k;c+=`<span class="chip${missing(val)?' miss':''}"><small>${lbl}</small>${missing(val)?'saknas':esc(val)}</span>`;}
+  for(const t of it.tags)c+=`<span class="chip"><small>Tagg</small>${esc(t)}</span>`;
+  if(it.fbox)c+=`<span class="chip plain">Fastighetsbox</span>`;
+  return c?`<div class="chips">${c}</div>`:'';}
+function flagsHTML(it){const h=hOf(it),st=status(it);let f='';
+  if(h.newCode)f+=`<span class="flag ok">Ny kod i listan – testa igen</span>`;
+  if(h.access)f+=`<span class="flag bad">${esc(PROBLEMS[h.access])}</span>`;
+  if(checkDue(it)&&!st)f+=`<span class="flag warn">${h.hhChanged?'Antal hushåll ändrat – ':''}Kontrollera om någon vill ha</span>`;
+  else if(h.hhChanged)f+=`<span class="flag warn">Antal hushåll ändrat – kolla igen</span>`;
+  if(st==='ejin')f+=`<span class="flag bad">Kom inte in i dag</span>`;
+  if(skipReason(it)&&S.showAll)f+=`<span class="flag warn">Hoppas över i smart rutt</span>`;
+  if(S.route&&S.geoDone&&!posOf(it))f+=`<span class="flag warn">Saknar plats på kartan</span>`;
+  return f;}
+function cardHTML(it,isNext,n){
+  const k=keyOf(it.address),h=hOf(it),st=status(it),w=want(it),isOpen=open===k,f=flagsHTML(it);
+  let body='';
+  if(isOpen){const v=h.vill??it.hh;
+    body=`<div class="body">
+      ${it.group?`<div class="note">${esc(it.group)}</div>`:''}
+      ${it.notes.length?`<div class="note plain">${esc(it.notes.join(' '))}</div>`:''}
+      <div class="row">
+        <button class="btn ${st==='klar'?'':'primary'}" data-act="done" data-k="${esc(k)}">${st==='klar'?'Ångra klar':'Utdelat ✓'}</button>
+        <button class="btn warn" data-act="noentry" data-k="${esc(k)}">Kom inte in</button>
+      </div>
+      <div class="row"><a class="btn small" href="${mapsURL(it)}" target="_blank" rel="noopener">Vägbeskrivning</a><button class="btn small" data-act="onmap" data-k="${esc(k)}">Visa på kartan</button></div>
+      <label class="lbl">Hur många av ${it.hh} hushåll vill ha reklam?</label>
+      <div class="stepper"><button data-act="v-" data-k="${esc(k)}" aria-label="Minska">−</button><output>${v}</output><button data-act="v+" data-k="${esc(k)}" aria-label="Öka">+</button>
+        <span class="muted" style="font-size:14px">${h.vill==null?'(inte rapporterat än)':''}</span></div>
+      <div class="opts"><button class="opt good" aria-pressed="${h.vill===it.hh}" data-act="vall" data-k="${esc(k)}">Alla ${it.hh}</button><button class="opt" aria-pressed="${h.vill===0}" data-act="v0" data-k="${esc(k)}">Ingen</button></div>
+      <label class="lbl">Problem att komma in</label>
+      <div class="opts">${Object.entries(PROBLEMS).map(([p,t])=>`<button class="opt" aria-pressed="${h.access===p}" data-act="prob" data-p="${p}" data-k="${esc(k)}">${t}</button>`).join('')}
+        ${h.access?`<button class="opt good" aria-pressed="true" data-act="probclear" data-k="${esc(k)}">Fungerar nu</button>`:''}</div>
+      <label class="lbl">Anteckning (kommer med i rapporten)</label>
+      <textarea data-note="${esc(k)}" placeholder="t.ex. ny kod står på dörren, porten öppen till 16">${esc(h.note||'')}</textarea>
+    </div>`;}
+  return `<div class="card${st?' done':''}${isNext?' next':''}" id="${idOf(k)}">
+    <button class="card-head" data-act="open" data-k="${esc(k)}">
+      <div class="ord">${st==='klar'?'✓':n}</div>
+      <div style="flex:1;min-width:0"><div class="addr">${esc(it.address)}</div>
+        <div class="meta">${it.hh} hushåll · <span class="give">ge ut ${w} ex</span>${h.vill!=null&&h.vill<it.hh?` <span class="muted">(${it.hh-h.vill} vill inte)</span>`:''}</div>
+        ${chipsHTML(it)}${f?`<div>${f}</div>`:''}
+        ${!isOpen&&(it.group||it.notes.length)?`<div class="peek">ℹ︎ ${esc((it.notes[0]||it.group).split('/')[0])}</div>`:''}</div>
+    </button>${body}</div>`;}
+function routeHTML(all,act){
+  const nx=nextItem(),remaining=act.filter(i=>!status(i));
+  let h=`<div class="toolbar"><label class="toggle"><input type="checkbox" data-act="smart" ${S.showAll?'':'checked'}> Smart rutt</label></div>`;
+  if(!act.length)h+=`<div class="empty"><p>Alla adresser hoppas över. Slå av Smart rutt för att se dem.</p></div>`;
+  h+=act.map(i=>cardHTML(i,nx&&i===nx,all.indexOf(i)+1)).join('');
+  if(!S.showAll){const sk=all.filter(skipReason);
+    if(sk.length)h+=`<details class="skipped"><summary>Hoppas över (${sk.length})</summary>${sk.map(i=>`<div class="skip-item"><div><b>${esc(i.address)}</b><div class="muted">${esc(skipReason(i))}</div></div><button class="btn small" data-act="unskip" data-k="${esc(keyOf(i.address))}">Ta med</button></div>`).join('')}</details>`;}
+  if(!remaining.length&&act.length)h+=`<div class="empty"><h2>Klart för i dag! 🎉</h2><p>Gå till Rapport för att skicka till din arbetsgivare.</p></div>`;
+  return h;}
+function reportText(){
+  const m=S.route.meta||{},all=items(),act=active(),done=act.filter(i=>status(i)==='klar');
+  let t=`Rapport distrikt ${m.district||''}${m.period?', period '+m.period:''}\n${m.date||''}\n\nUtdelat: ${done.length} av ${act.length} adresser, ${done.reduce((s,i)=>s+want(i),0)} ex.\n`;
+  const probs=all.filter(i=>hOf(i).access||status(i)==='ejin'||(i.codes.some(missing)&&status(i)!=='klar'));
+  t+=`\nÅTKOMSTPROBLEM (${probs.length})\n`+(probs.length?'':'Inga.\n');
+  for(const i of probs){const h=hOf(i);const what=h.access?PROBLEMS[h.access]:(i.codes.some(missing)?'Kod saknas i listan':'Kom inte in');
+    const cur=[...i.codes.filter(c=>!missing(c)).map(c=>'kod '+c),...i.tags.map(x=>'tagg '+x)].join(', ');
+    t+=`- ${i.address}: ${what}${cur?' (i listan: '+cur+')':''}${h.note?'. '+h.note:''}\n`;}
+  const rep=all.filter(i=>hOf(i).vill!=null&&hOf(i).vill<i.hh);
+  const sumH=all.reduce((s,i)=>s+i.hh,0),sumW=all.reduce((s,i)=>s+want(i),0);
+  t+=`\nVILL HA REKLAM\nBehov: ${sumW} ex av ${sumH} hushåll i distriktet.\n`;
+  for(const i of rep)t+=`- ${i.address}: ${hOf(i).vill} av ${i.hh} vill ha${hOf(i).vill===0?' (ingen)':''}\n`;
+  const other=all.filter(i=>hOf(i).note&&!probs.includes(i));
+  if(other.length){t+=`\nÖVRIGT\n`;for(const i of other)t+=`- ${i.address}: ${hOf(i).note}\n`;}
+  return t;}
+function reportHTML(){return `<div class="toolbar"><button class="btn primary" data-act="copy">Kopiera rapport</button><button class="btn" data-act="savefile">Spara som fil</button></div>
+  <p class="muted" style="font-size:14px;margin:0 0 10px">Kopiera och klistra in i ett mejl eller sms till arbetsgivaren.</p><pre class="report" id="reportText">${esc(reportText())}</pre>`;}
+function setupHTML(){const m=S.route&&S.route.meta;const miss=S.route?items().filter(i=>!posOf(i)).length:0;
+  return `<div class="section-title">Adresslista</div><div class="card"><div class="body" style="padding-top:14px">
+    ${m?`<div><b>Distrikt ${esc(m.district||'')}</b> · period ${esc(m.period||'')}</div><div class="muted" style="font-size:14px">${S.route.items.length} adresser · inläst ${new Date(S.route.importedAt).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})}${miss?` · ${miss} saknar plats på kartan`:''}</div>`:'<div class="muted">Ingen lista inläst ännu.</div>'}
+    <div class="row"><label class="btn primary file">Läs in ny vecka (PDF)…<input type="file" accept="application/pdf,.pdf" data-file></label></div>
+    <p class="muted" style="font-size:13px;margin:10px 0 0">Det hon rapporterat (vill ha reklam, problem med kod) sparas mellan veckorna. En ny period nollställer bara bockarna. Byts koden i listan för ett hus med kodproblem tas huset med igen och märks ”Ny kod”. Hus där ingen vill ha reklam tas med för kontroll var ${CHECK_EVERY}:e vecka, eller direkt om antalet hushåll ändras i listan.</p>
+  </div></div>
+  <div class="section-title">Inställningar</div><div class="card"><div class="body" style="padding-top:4px">
+    <label class="lbl">Ort (för adressökning)</label><input type="text" data-city value="${esc(S.city)}">
+    <div class="row"><button class="btn" data-act="regeo">Sök adresserna på kartan igen</button></div>
+    <div class="row"><button class="btn" data-act="resetweek">Nollställ veckans bockar</button></div>
+  </div></div>
+  <div class="section-title">Säkerhetskopia</div><div class="card"><div class="body" style="padding-top:14px">
+    <p class="muted" style="font-size:14px;margin:0 0 8px">Allt sparas i telefonens webbläsare. Kopiera en säkerhetskopia ibland och spara i Anteckningar.</p>
+    <div class="row"><button class="btn" data-act="backup">Kopiera säkerhetskopia</button><button class="btn" data-act="restore">Återställ…</button></div>
+    <div class="row"><button class="btn warn" data-act="wipe">Radera allt</button></div>
+  </div></div>`;}
+function dock(it){const d=$('#dock');if(!it){d.classList.add('hidden');return;}d.classList.remove('hidden');
+  $('#dockAddr').textContent=it.address;
+  const c=[...it.codes.map(x=>missing(x)?'kod saknas':x.replace(/^(Grind|Port);\s*/,'$1 ')),...it.tags.map(x=>'tagg '+x)];
+  $('#dockMeta').textContent='ge ut '+want(it)+' ex'+(c.length?' · '+c.join(' · '):'');
+  $('#dockMap').textContent=tab==='map'?'Kort':'Karta';d.dataset.k=keyOf(it.address);}
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2000);}
+function modal(html){$('#sheet').innerHTML=html;$('#modal').classList.add('open');}
+function closeModal(){$('#modal').classList.remove('open');}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+
+// ======================= KARTA =======================
+let map=null,layer=null,line=null,me=null,meAcc=null,watchId=null,fitted=false,moveKey=null,lastMe=null;
+function posOf(it){const h=hOf(it);if(h.pos)return h.pos;const g=S.geo[geoKey(it.address)];return g||null;}
+function geoKey(a){return keyOf(a)+'|'+keyOf(S.city);}
+function ensureMap(){
+  if(map)return true;
+  if(!window.L){$('#mapBanner').textContent='Kartan kunde inte laddas – kontrollera internet.';$('#mapBanner').classList.remove('hidden');return false;}
+  map=L.map('map',{zoomControl:false}).setView([58.4108,15.6214],15);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  layer=L.layerGroup().addTo(map);
+  map.on('click',e=>{if(!moveKey)return;const h=S.houses[moveKey]||(S.houses[moveKey]={});h.pos=[+e.latlng.lat.toFixed(6),+e.latlng.lng.toFixed(6)];moveKey=null;save();banner();drawMap();toast('Nålen är flyttad');});
+  startGPS();
+  return true;}
+function pinState(it,isNext){const st=status(it);if(st==='klar')return 'done';if(st==='ejin')return 'ejin';if(isNext)return 'next';if(skipReason(it))return 'skip';if(checkDue(it))return 'check';return 'todo';}
+function drawMap(){
+  if(!ensureMap())return;
+  setTimeout(()=>map.invalidateSize(),50);
+  layer.clearLayers();
+  const all=items(),nx=nextItem(),seen={},pts=[],route=[];
+  all.forEach((it,i)=>{let p=posOf(it);if(!p)return;
+    const sk=p[0].toFixed(5)+','+p[1].toFixed(5);const n=seen[sk]=(seen[sk]||0)+1;
+    if(n>1){const a=(n-1)*1.9,r=0.00006;p=[p[0]+r*Math.cos(a),p[1]+r*Math.sin(a)*1.9];}
+    const state=pinState(it,it===nx);
+    const icon=L.divIcon({className:'',html:`<div class="pin ${state}"><span>${state==='done'?'✓':i+1}</span></div>`,iconSize:state==='next'?[38,38]:[30,30],iconAnchor:state==='next'?[19,38]:[15,30],popupAnchor:[0,-30]});
+    const mk=L.marker(p,{icon,zIndexOffset:state==='next'?1000:(state==='skip'||state==='done'?-100:0)}).addTo(layer);
+    mk.bindPopup(()=>popupHTML(it),{autoPanPadding:[20,80]});
+    pts.push(p);
+    if(!status(it)&&!skipReason(it))route.push(p);});
+  if(nx&&posOf(nx)&&lastMe)route.unshift(lastMe);
+  if(route.length>1)L.polyline(route,{color:'#1f5f4a',weight:4,opacity:.75,dashArray:'6 8'}).addTo(layer);
+  if(!fitted&&pts.length){map.fitBounds(pts,{padding:[30,30]});fitted=true;}
+  banner();}
+function popupHTML(it){const k=keyOf(it.address),st=status(it);
+  const c=[...it.codes.map(x=>missing(x)?'kod saknas':x.replace(/^(Grind|Port);\s*/,'$1 ')),...it.tags.map(x=>'tagg '+x)];
+  return `<div class="addr">${esc(it.address)}</div><div class="meta">${it.hh} hushåll · <b>ge ut ${want(it)} ex</b></div>${c.length?`<div style="margin-top:4px;font-family:ui-monospace,Menlo,monospace">${esc(c.join(' · '))}</div>`:''}
+  <div class="row"><button class="btn small ${st==='klar'?'':'primary'}" data-act="done" data-k="${esc(k)}">${st==='klar'?'Ångra':'Klar ✓'}</button><button class="btn small" data-act="showcard" data-k="${esc(k)}">Detaljer</button></div>
+  <div class="row"><a class="btn small" href="${mapsURL(it)}" target="_blank" rel="noopener">Vägbeskrivning</a><button class="btn small" data-act="move" data-k="${esc(k)}">Flytta nål</button></div>`;}
+function banner(){const b=$('#mapBanner');let t='';
+  if(moveKey)t='Tryck på kartan där <b>'+esc(byKey(moveKey)?.address||'')+'</b> ligger. <a href="#" data-act="movecancel">Avbryt</a>';
+  else if(geoBusy)t=`Hittar adresserna på kartan… ${geoBusy.done} av ${geoBusy.total}`;
+  else if(S.route){const miss=items().filter(i=>!posOf(i));if(miss.length)t=`${miss.length} ${miss.length===1?'adress':'adresser'} hittades inte. Tryck på dem i Rutt → <i>Visa på kartan</i> för att placera dem.`;}
+  b.innerHTML=t;b.classList.toggle('hidden',!t);}
+function startGPS(){
+  if(!navigator.geolocation||watchId!==null)return;
+  watchId=navigator.geolocation.watchPosition(p=>{
+    lastMe=[p.coords.latitude,p.coords.longitude];
+    if(!me){me=L.marker(lastMe,{icon:L.divIcon({className:'',html:'<div class="me-dot"></div>',iconSize:[16,16],iconAnchor:[8,8]}),zIndexOffset:2000,interactive:false}).addTo(map);
+      meAcc=L.circle(lastMe,{radius:p.coords.accuracy,color:'#1a73e8',weight:1,fillOpacity:.08,interactive:false}).addTo(map);}
+    else{me.setLatLng(lastMe);meAcc.setLatLng(lastMe).setRadius(p.coords.accuracy);}
+  },err=>{if(err.code===1)toast('Tillåt platsåtkomst i Safari för att se din position');},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});}
+$('#btnMe').addEventListener('click',()=>{if(lastMe&&map)map.setView(lastMe,18);else{startGPS();toast('Söker din position…');}});
+$('#btnFit').addEventListener('click',()=>{if(!map)return;const pts=items().map(posOf).filter(Boolean);if(pts.length)map.fitBounds(pts,{padding:[30,30]});});
+
+// ---------- adressökning (OpenStreetMap Nominatim, max 1 fråga/sekund) ----------
+let geoBusy=null;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function nominatim(params){
+  const u='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=se&'+new URLSearchParams(params);
+  const r=await fetch(u,{headers:{'Accept-Language':'sv'}});if(!r.ok)throw new Error('HTTP '+r.status);
+  const j=await r.json();return j[0]?[+(+j[0].lat).toFixed(6),+(+j[0].lon).toFixed(6)]:null;}
+async function geocodeOne(addr){
+  const m=addr.match(/^(.*?)\s+(\d+)\s*([A-Za-zÅÄÖåäö])?$/);
+  const street=m?m[1]:addr,num=m?m[2]:'',let_=m&&m[3]?m[3]:'';
+  const tries=[];
+  if(let_)tries.push({street:`${num}${let_} ${street}`,city:S.city});
+  if(num)tries.push({street:`${num} ${street}`,city:S.city});
+  tries.push({q:`${addr}, ${S.city}`});
+  for(const t of tries){const k='q:'+JSON.stringify(t);
+    if(k in S.geo){if(S.geo[k])return S.geo[k];continue;}
+    let res=null;try{res=await nominatim(t);}catch(e){await sleep(1100);return undefined;} // nätverksfel: försök senare
+    S.geo[k]=res;await sleep(1100);if(res)return res;}
+  return null;}
+async function geocodeAll(force){
+  if(geoBusy||!S.route)return;
+  const todo=items().filter(i=>force||!(geoKey(i.address) in S.geo));
+  if(!todo.length){S.geoDone=true;return;}
+  geoBusy={done:0,total:todo.length};banner();
+  for(const it of todo){const r=await geocodeOne(it.address);if(r!==undefined)S.geo[geoKey(it.address)]=r;geoBusy.done++;save();if(tab==='map')drawMap();else banner();}
+  geoBusy=null;S.geoDone=true;save();fitted=false;render();
+  const miss=items().filter(i=>!posOf(i)).length;toast(miss?`${miss} ${miss===1?'adress':'adresser'} hittades inte på kartan`:'Alla adresser finns på kartan');}
+
+// ======================= INLÄSNING =======================
+let pdfjs=null;
+async function loadPdfjs(){if(pdfjs)return pdfjs;const w=await import('./pdf.worker.min.js');globalThis.pdfjsWorker=w;pdfjs=await import('./pdf.min.js');return pdfjs;}
+async function importPdf(file){
+  toast('Läser in listan…');
+  try{
+    const lib=await loadPdfjs();
+    const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+    const pages=[];
+    for(let p=1;p<=doc.numPages;p++){const tc=await (await doc.getPage(p)).getTextContent();pages.push(tc.items.map(i=>({str:i.str,x:i.transform[4],y:i.transform[5],w:i.width})));}
+    const r=parseRouteItems(pages);
+    if(!r.items.length)throw new Error('Hittade inga adresser i filen.');
+    const newPeriod=!S.route||(r.meta.period||'')!==(S.route.meta.period||'');
+    if(newPeriod){S.week={period:r.meta.period||null,no:(S.week.no||0)+(S.route?1:0),done:{}};}
+    let codeN=0,hhN=0;
+    for(const it of r.items){const h=H(it),snap=JSON.stringify([it.codes,it.tags]);
+      if(h.snap&&h.snap!==snap){h.newCode=true;codeN++;}else if(newPeriod)delete h.newCode;
+      if(h.hh!=null&&h.hh!==it.hh){h.hhChanged=true;hhN++;}
+      h.snap=snap;h.hh=it.hh;if(h.zeroSince==null&&h.vill===0)h.zeroSince=S.week.no;}
+    S.route={meta:r.meta,items:r.items,importedAt:Date.now()};
+    save();tab='route';open=null;fitted=false;render();
+    toast(`${r.items.length} adresser inlästa`+(codeN?` · ${codeN} med ny kod`:'')+(hhN?` · ${hhN} med ändrat antal hushåll`:''));
+    geocodeAll(false);
+  }catch(e){console.error(e);modal(`<h3 style="margin-top:0">Kunde inte läsa filen</h3><p class="muted">${esc(e.message||e)}</p><p class="muted">Kontrollera att det är adresslistan som PDF från utdelare.nu.</p><button class="btn block" data-act="close">Stäng</button>`);}
+}
+
+// ======================= HÄNDELSER =======================
+const byKey=k=>items().find(i=>keyOf(i.address)===k);
+function rerenderKeep(){const y=scrollY;render();scrollTo(0,y);}
+document.addEventListener('change',e=>{
+  if(e.target.matches('[data-file]')&&e.target.files[0]){importPdf(e.target.files[0]);e.target.value='';}
+  if(e.target.matches('[data-act=smart]')){S.showAll=!e.target.checked;save();render();}
+  if(e.target.matches('[data-city]')){S.city=e.target.value.trim()||'Linköping';save();}
+});
+let noteT=null;
+document.addEventListener('input',e=>{if(e.target.matches('[data-note]')){const k=e.target.dataset.note;const h=S.houses[k]||(S.houses[k]={});h.note=e.target.value;clearTimeout(noteT);noteT=setTimeout(save,400);}});
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-act],[data-tab]');if(!t||t.matches('input'))return;
+  if(t.dataset.tab){tab=t.dataset.tab;open=null;render();scrollTo(0,0);return;}
+  const a=t.dataset.act,k=t.dataset.k,it=k&&byKey(k);
+  if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
+  switch(a){
+    case 'open':open=open===k?null:k;rerenderKeep();break;
+    case 'done':if(status(it)==='klar')delete S.week.done[k];else markDone(it);open=null;save();
+      if(map)map.closePopup();render();toast(status(it)==='klar'?'Klar ✓':'Ångrat');if(tab==='route')scrollNext();break;
+    case 'noentry':{S.week.done[k]='ejin';const h=H(it);if(!h.access)h.access=it.codes.some(missing)?'saknas':(it.tags.length&&!it.codes.length?'tagg':'kod');delete h.newCode;save();open=k;rerenderKeep();toast('Markerat – välj vad som var fel');break;}
+    case 'v+':setVill(it,(hOf(it).vill??it.hh)+1);save();rerenderKeep();break;
+    case 'v-':setVill(it,(hOf(it).vill??it.hh)-1);save();rerenderKeep();break;
+    case 'vall':setVill(it,it.hh);save();rerenderKeep();break;
+    case 'v0':setVill(it,0);save();rerenderKeep();break;
+    case 'prob':{const h=H(it);if(h.access===t.dataset.p)delete h.access;else h.access=t.dataset.p;delete h.newCode;save();rerenderKeep();break;}
+    case 'probclear':{const h=H(it);delete h.access;if(status(it)==='ejin')delete S.week.done[k];save();rerenderKeep();break;}
+    case 'unskip':{const h=H(it);delete h.access;if(h.vill===0){h.zeroSince=S.week.no-CHECK_EVERY;}save();render();toast('Tas med i rutten');break;}
+    case 'onmap':case 'move':tab='map';open=null;render();if(a==='move'||!posOf(it)){moveKey=k;if(map)map.closePopup();banner();if(!posOf(it))toast('Tryck på kartan där huset ligger');}
+      else{map&&map.setView(posOf(it),18);}break;
+    case 'movecancel':moveKey=null;banner();break;
+    case 'showcard':tab='route';open=k;render();setTimeout(()=>document.getElementById(idOf(k))?.scrollIntoView({block:'start'}),30);break;
+    case 'copy':try{await navigator.clipboard.writeText(reportText());toast('Rapporten är kopierad');}catch(_){selectReport();toast('Markera och kopiera texten');}break;
+    case 'savefile':{const m=S.route.meta||{};const url=URL.createObjectURL(new Blob([reportText()],{type:'text/plain;charset=utf-8'}));const l=document.createElement('a');l.href=url;l.download=`rapport-${m.district||'distrikt'}-${m.period||''}.txt`;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);break;}
+    case 'regeo':for(const key of Object.keys(S.geo))delete S.geo[key];S.geoDone=false;save();tab='map';render();geocodeAll(true);break;
+    case 'resetweek':modal(`<h3 style="margin-top:0">Nollställ veckans bockar?</h3><p class="muted">Rapporterat antal som vill ha reklam och kodproblem sparas.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="doresetweek">Nollställ</button></div>`);break;
+    case 'doresetweek':S.week.done={};save();closeModal();render();toast('Nollställt');break;
+    case 'wipe':modal(`<h3 style="margin-top:0">Radera allt?</h3><p class="muted">Listan och allt hon rapporterat tas bort. Det går inte att ångra.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn warn" data-act="dowipe">Radera</button></div>`);break;
+    case 'dowipe':{const c=S.city;S=blank();S.city=c;save();closeModal();tab='route';render();break;}
+    case 'backup':try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Säkerhetskopia kopierad');}catch(_){modal(`<h3 style="margin-top:0">Säkerhetskopia</h3><textarea readonly style="min-height:160px">${esc(JSON.stringify(S))}</textarea><div class="row"><button class="btn" data-act="close">Stäng</button></div>`);}break;
+    case 'restore':modal(`<h3 style="margin-top:0">Återställ säkerhetskopia</h3><textarea id="restoreTxt" style="min-height:140px" placeholder="Klistra in här"></textarea><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="dorestore">Återställ</button></div>`);break;
+    case 'dorestore':try{const o=JSON.parse($('#restoreTxt').value);if(!o||typeof o!=='object'||!('houses' in o))throw 0;S=Object.assign(blank(),o);save();closeModal();fitted=false;render();toast('Återställt');}catch(_){toast('Ogiltig säkerhetskopia');}break;
+    case 'close':closeModal();break;
+  }
+});
+$('#dockDone').addEventListener('click',()=>{const it=byKey($('#dock').dataset.k);if(!it)return;markDone(it);save();if(map)map.closePopup();render();toast('Klar ✓');if(tab==='route')scrollNext();});
+$('#dockMap').addEventListener('click',()=>{const k=$('#dock').dataset.k,it=byKey(k);if(tab==='map'){tab='route';open=k;render();setTimeout(()=>document.getElementById(idOf(k))?.scrollIntoView({block:'start'}),30);}else{tab='map';render();if(it&&posOf(it)&&map)map.setView(posOf(it),18);}});
+function scrollNext(){const n=nextItem();if(!n)return;document.getElementById(idOf(keyOf(n.address)))?.scrollIntoView({behavior:'smooth',block:'center'});}
+function selectReport(){const el=$('#reportText');if(!el)return;const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);}
+
+load();render();if(S.route)geocodeAll(false);
+</script>
+</body>
+</html>

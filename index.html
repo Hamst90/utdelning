@@ -287,7 +287,7 @@ function flagsHTML(it){const h=hOf(it),st=status(it);let f='';
 function cardHTML(it,isNext,n){
   const k=keyOf(it.address),h=hOf(it),st=status(it),w=want(it),isOpen=open===k,f=flagsHTML(it);
   let body='';
-  if(isOpen){const v=h.vill??it.hh;
+  if(isOpen){const v=h.vill??Math.min(1,it.hh);
     body=`<div class="body">
       ${it.group?`<div class="note">${esc(it.group)}</div>`:''}
       ${it.notes.length?`<div class="note plain">${esc(it.notes.join(' '))}</div>`:''}
@@ -298,8 +298,8 @@ function cardHTML(it,isNext,n){
       <div class="row"><a class="btn small" href="${mapsURL(it)}" target="_blank" rel="noopener">Vägbeskrivning</a><button class="btn small" data-act="onmap" data-k="${esc(k)}">Visa på kartan</button></div>
       <label class="lbl">Hur många av ${it.hh} hushåll vill ha reklam?</label>
       <div class="stepper"><button data-act="v-" data-k="${esc(k)}" aria-label="Minska">−</button><output>${v}</output><button data-act="v+" data-k="${esc(k)}" aria-label="Öka">+</button>
-        <span class="muted" style="font-size:14px">${h.vill==null?'(inte rapporterat än)':''}</span></div>
-      <div class="opts"><button class="opt good" aria-pressed="${h.vill===it.hh}" data-act="vall" data-k="${esc(k)}">Alla ${it.hh}</button><button class="opt" aria-pressed="${h.vill===0}" data-act="v0" data-k="${esc(k)}">Ingen</button></div>
+        <span class="muted" style="font-size:14px">${h.vill==null?'inte sparat än – tryck en knapp':''}</span></div>
+      <div class="opts"><button class="opt" aria-pressed="${h.vill===0}" data-act="v0" data-k="${esc(k)}">Ingen</button>${[1,2].filter(n=>n<it.hh).map(n=>`<button class="opt good" aria-pressed="${h.vill===n}" data-act="vn" data-n="${n}" data-k="${esc(k)}">${n}</button>`).join('')}<button class="opt good" aria-pressed="${h.vill===it.hh}" data-act="vall" data-k="${esc(k)}">Alla ${it.hh}</button></div>
       <label class="lbl">Problem att komma in</label>
       <div class="opts">${Object.entries(PROBLEMS).map(([p,t])=>`<button class="opt" aria-pressed="${h.access===p}" data-act="prob" data-p="${p}" data-k="${esc(k)}">${t}</button>`).join('')}
         ${h.access?`<button class="opt good" aria-pressed="true" data-act="probclear" data-k="${esc(k)}">Fungerar nu</button>`:''}</div>
@@ -493,8 +493,9 @@ document.addEventListener('click',async e=>{
     case 'done':if(status(it)==='klar')delete S.week.done[k];else markDone(it);open=null;save();
       if(map)map.closePopup();render();toast(status(it)==='klar'?'Klar ✓':'Ångrat');if(tab==='route')scrollNext();break;
     case 'noentry':{S.week.done[k]='ejin';const h=H(it);if(!h.access)h.access=it.codes.some(missing)?'saknas':(it.tags.length&&!it.codes.length?'tagg':'kod');delete h.newCode;save();open=k;rerenderKeep();toast('Markerat – välj vad som var fel');break;}
-    case 'v+':setVill(it,(hOf(it).vill??it.hh)+1);save();rerenderKeep();break;
-    case 'v-':setVill(it,(hOf(it).vill??it.hh)-1);save();rerenderKeep();break;
+    case 'v+':setVill(it,(hOf(it).vill??Math.min(1,it.hh))+1);save();rerenderKeep();break;
+    case 'v-':setVill(it,(hOf(it).vill??Math.min(1,it.hh))-1);save();rerenderKeep();break;
+    case 'vn':setVill(it,+t.dataset.n);save();rerenderKeep();break;
     case 'vall':setVill(it,it.hh);save();rerenderKeep();break;
     case 'v0':setVill(it,0);save();rerenderKeep();break;
     case 'prob':{const h=H(it);if(h.access===t.dataset.p)delete h.access;else h.access=t.dataset.p;delete h.newCode;save();rerenderKeep();break;}

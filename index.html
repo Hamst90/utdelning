@@ -450,8 +450,13 @@ function setupHTML(){const m=S.route&&S.route.meta;const miss=S.route?items().fi
   </div></div>`;}
 function dock(it){const d=$('#dock');
   if(!it){d.classList.add('hidden');document.body.classList.remove('has-dock');
-    if(S.route&&tab==='map'&&S.week.closed){const n=notVisited().length;d.classList.remove('hidden');document.body.classList.add('has-dock');$('#dockInner').innerHTML=`<div class="what"><div class="addr">Utdelningen är avslutad</div><div class="meta">${n?n+(n===1?' adress':' adresser')+' ej besökta · ':''}Rapporten finns i menyn ☰</div></div><div class="dbtns"><button class="btn" data-act="reopen">Öppna igen</button><button class="btn primary" data-go="report">Visa rapport</button></div>`;}
-    else if(S.route&&(tab==='map')&&active().length&&!active().some(i=>!status(i))){d.classList.remove('hidden');document.body.classList.add('has-dock');$('#dockInner').innerHTML=`<div class="what"><div class="addr">Klart för i dag! 🎉</div><div class="meta">Rapporten finns i menyn ☰</div></div><div class="dbtns"><button class="btn primary" data-go="report">Visa rapport</button></div>`;}
+    const finished=S.route&&(S.week.closed||(active().length&&!active().some(i=>!status(i))));
+    if(finished&&(tab==='map'||tab==='route')){const n=notVisited().length,nx=nextList();
+      d.classList.remove('hidden');document.body.classList.add('has-dock');
+      $('#dockInner').innerHTML=`<div class="what"><div class="addr">${S.week.closed?'Utdelningen är avslutad':'Klart! 🎉'}</div>
+        <div class="meta">${n?n+(n===1?' adress':' adresser')+' ej besökta · ':''}<a href="#" data-go="report">Visa rapport</a></div></div>
+        <div class="dbtns"><button class="btn" data-act="reopen">Återuppta</button>
+        ${nx?`<button class="btn primary" data-act="openlist" data-p="${esc(nx)}">Starta ${esc(shortDate(S.lists[nx].meta))}</button>`:`<button class="btn primary" data-go="weeks">Ny utdelning</button>`}</div>`;}
     return;}
   d.classList.remove('hidden');document.body.classList.add('has-dock');
   const k=keyOf(it.address);
@@ -460,6 +465,12 @@ function dock(it){const d=$('#dock');
       <div class="addr">${esc(it.address)}</div>${chipsHTML(it)}${infoText(it)?`<div class="dinfo">📍 ${esc(infoText(it))}</div>`:''}</button>
     <div class="dbtns"><button class="btn warn" data-act="probopen" data-k="${esc(k)}">Kod/tagg funkade ej</button><button class="btn primary" data-act="pickopen" data-k="${esc(k)}">Klar ✓</button></div>`;}
 
+// Nästa lista att dela ut: den tidigaste listan efter den öppna som inte är klar eller avslutad.
+function nextList(){const cur=S.week.period,cn=periodNo(cur)??-1;
+  return Object.keys(S.lists).filter(p=>p!==cur&&(periodNo(p)??0)>cn&&!/^(Klar|Avslutad)/.test(weekStatus(p).label))
+    .sort((a,b)=>(periodNo(a)??0)-(periodNo(b)??0))[0]||null;}
+function weekFinished(){return S.route&&(S.week.closed||(active().length&&!active().some(i=>!status(i))));}
+const shortDate=meta=>{const d=listDate(meta);return d?d.toLocaleDateString('sv-SE',{day:'numeric',month:'short'}):'nästa';};
 // ---------- husbladet (öppnas över kartan) ----------
 function houseHTML(it){
   const k=keyOf(it.address),h=hOf(it),st=status(it),v=h.vill??Math.min(1,it.hh);
@@ -785,7 +796,7 @@ async function loadRemote(){
     const fresh=j.files.filter(f=>!before.has(f.id)&&S.fileMap[f.id]&&S.fileMap[f.id]!==S.week.period);
     if(fresh.length&&S.route&&tab!=='weeks')toast(`${fresh.length===1?'En ny adresslista':fresh.length+' nya adresslistor'} – ☰ → Adresslistor`);
   }catch(e){remoteErr=String(e.message||e);}
-  remoteBusy=false;if(tab==='weeks')render();}
+  remoteBusy=false;if(tab==='weeks'||weekFinished())render();}
 function weekStatus(per){
   const L=S.lists[per];if(!L)return {label:'',cls:''};
   const w=per===S.week.period?S.week:(S.weeks[per]||{done:{}});
@@ -852,7 +863,8 @@ document.addEventListener('click',async e=>{
     case 'closeweek':{const left=active().filter(i=>!status(i)).length;
       modal(`<h3 style="margin-top:0">Avsluta utdelningen?</h3><p class="muted">${left?`<b>${left} ${left===1?'adress är':'adresser är'} inte besökta.</b> De markeras som ”Ej besökt” i rapporten och kalkylarket. Det hon rapporterat om husen påverkas inte.`:'Alla adresser är besökta.'}</p><p class="muted">Du kan öppna utdelningen igen om du ångrar dig.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="doclose">Avsluta</button></div>`);break;}
     case 'doclose':{const left=active().filter(i=>!status(i));S.week.closed=Date.now();for(const i of left)touch(i);save();closeModal();tab='map';render();toast('Utdelningen är avslutad');break;}
-    case 'reopen':{const left=active().filter(i=>!status(i));S.week.closed=null;for(const i of left)touch(i);save();closeModal();render();toast('Utdelningen är öppen igen');break;}
+    case 'reopen':{const left=active().filter(i=>!status(i));const was=S.week.closed;S.week.closed=null;for(const i of left)touch(i);save();closeModal();tab='map';render();
+      toast(was?'Utdelningen är återupptagen':(left.length?'Utdelningen är återupptagen':'Alla adresser är redan klara – öppna ett hus för att ändra'));break;}
     case 'pinsubmit':submitPin();break;
     case 'openlist':openList(t.dataset.p);break;
     case 'refreshlists':loadRemote();break;
@@ -909,6 +921,8 @@ function connectFromHash(){if(!location.hash.startsWith('#kalkylark='))return;co
 connectFromHash();addEventListener('hashchange',connectFromHash);
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pinStart')submitPin();if(e.key==='Enter'&&e.target.id==='pinIn')$('[data-act=dopull]')?.click();});
 if(!S.route)tab=S.pin?'weeks':'pin';
+// Är förra utdelningen klar och en ny lista finns? Börja på adresslistorna.
+else if(weekFinished()&&nextList())tab='weeks';
 render();syncUI();syncNow();if(S.route)geocodeAll(false);if(S.pin)loadRemote();
 </script>
 </body>

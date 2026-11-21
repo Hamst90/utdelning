@@ -133,6 +133,7 @@ pre.report{white-space:pre-wrap;background:var(--card);border:1px solid var(--li
     <div class="sub" id="subtitle">Ingen adresslista inläst</div>
     <div class="progress"><i id="bar"></i></div>
     <div class="stats" id="stats"></div>
+    <div class="sync hidden" id="syncStatus"></div>
   </header>
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="route" aria-selected="true">Rutt</button>
@@ -219,7 +220,7 @@ const keyOf=a=>a.toLowerCase().replace(/\s+/g,' ').trim();
 const missing=c=>/\?{2,}/.test(c);
 const idOf=k=>'c-'+k.replace(/[^a-z0-9åäö]/g,'_');
 
-function blank(){return {v:2,updatedAt:0,city:'Linköping',route:null,houses:{},week:{period:null,no:0,done:{}},showAll:false,geo:{}};}
+function blank(){return {v:2,updatedAt:0,city:'Linköping',route:null,houses:{},week:{period:null,no:0,done:{}},showAll:false,geo:{},sync:{url:'',queue:{},last:0}};}
 let S=blank();
 function load(){try{const j=localStorage.getItem(LS);if(j)S=Object.assign(blank(),JSON.parse(j));}catch(e){}}
 function save(){S.updatedAt=Date.now();try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){toast('Kunde inte spara i telefonen');}}
@@ -346,6 +347,13 @@ function setupHTML(){const m=S.route&&S.route.meta;const miss=S.route?items().fi
     <div class="row"><label class="btn primary file">Läs in ny vecka (PDF)…<input type="file" accept="application/pdf,.pdf" data-file></label></div>
     <p class="muted" style="font-size:13px;margin:10px 0 0">Det hon rapporterat (vill ha reklam, problem med kod) sparas mellan veckorna. En ny period nollställer bara bockarna. Byts koden i listan för ett hus med kodproblem tas huset med igen och märks ”Ny kod”. Hus där ingen vill ha reklam tas med för kontroll var ${CHECK_EVERY}:e vecka, eller direkt om antalet hushåll ändras i listan.</p>
   </div></div>
+  <div class="section-title">Kalkylark</div><div class="card"><div class="body" style="padding-top:4px">
+    <label class="lbl">Skriptets webbappslänk (slutar på /exec)</label>
+    <input type="text" data-syncurl value="${esc(S.sync.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="row"><button class="btn" data-act="synctest">Testa kopplingen</button><button class="btn" data-act="syncall">Skicka allt igen</button></div>
+    <div class="row"><button class="btn" data-act="syncpull">Hämta från kalkylarket</button></div>
+    <p class="muted" style="font-size:13px;margin:10px 0 0">Varje gång hon rapporterar något skickas huset till kalkylarket (en rad per hus och vecka). Utan täckning sparas det i telefonen och skickas när nätet är tillbaka. ”Hämta från kalkylarket” används på en ny telefon. Portkoder skickas aldrig.</p>
+  </div></div>
   <div class="section-title">Inställningar</div><div class="card"><div class="body" style="padding-top:4px">
     <label class="lbl">Ort (för adressökning)</label><input type="text" data-city value="${esc(S.city)}">
     <div class="row"><button class="btn" data-act="regeo">Sök adresserna på kartan igen</button></div>
@@ -447,6 +455,55 @@ async function geocodeAll(force){
   geoBusy=null;S.geoDone=true;save();fitted=false;render();
   const miss=items().filter(i=>!posOf(i)).length;toast(miss?`${miss} ${miss===1?'adress':'adresser'} hittades inte på kartan`:'Alla adresser finns på kartan');}
 
+// ======================= KALKYLARK =======================
+function rowFor(it){const h=hOf(it),m=S.route.meta||{},st=status(it);
+  return {period:m.period||'',date:m.date||'',district:m.district||'',order:items().indexOf(it)+1,address:it.address,hh:it.hh,vill:h.vill??null,
+    status:st==='klar'?'Utdelat':st==='ejin'?'Kom inte in':'',problem:h.access?PROBLEMS[h.access]:'',note:h.note||'',updated:Date.now()};}
+function touch(it){if(!it||!S.route){save();return;}const h=H(it);h.updated=Date.now();
+  S.sync.queue[(S.route.meta.period||'')+'|'+keyOf(it.address)]=rowFor(it);save();scheduleSync();}
+let syncBusy=false,syncT=null,syncErr=null;
+function scheduleSync(ms=1500){clearTimeout(syncT);syncT=setTimeout(syncNow,ms);syncUI();}
+async function syncNow(){
+  const keys=Object.keys(S.sync.queue);
+  if(syncBusy||!S.sync.url||!keys.length)return syncUI();
+  if(navigator.onLine===false){syncErr='offline';return syncUI();}
+  syncBusy=true;syncUI();
+  const rows=keys.map(k=>S.sync.queue[k]);
+  try{const r=await fetch(S.sync.url,{method:'POST',body:JSON.stringify({rows}),redirect:'follow'});
+    const j=await r.json();if(!j.ok)throw new Error(j.error||'okänt fel');
+    keys.forEach((k,i)=>{if(S.sync.queue[k]&&S.sync.queue[k].updated===rows[i].updated)delete S.sync.queue[k];});
+    S.sync.last=Date.now();syncErr=null;save();}
+  catch(e){syncErr=String(e&&e.message||e);}
+  syncBusy=false;syncUI();
+  if(!syncErr&&Object.keys(S.sync.queue).length)scheduleSync(800);}
+function syncUI(){const el=$('#syncStatus');if(!el)return;const n=Object.keys(S.sync.queue).length;let t='';
+  if(S.sync.url){
+    if(syncBusy)t='☁︎ Skickar till kalkylarket…';
+    else if(!n)t='☁︎ Allt är sparat i kalkylarket';
+    else if(syncErr==='offline')t=`☁︎ ${n} ${n===1?'hus väntar':'hus väntar'} – skickas när nätet är tillbaka`;
+    else if(syncErr)t=`☁︎ ${n} hus väntar – kunde inte skicka, försöker igen`;
+    else t=`☁︎ ${n} hus väntar på att skickas`;}
+  el.textContent=t;el.classList.toggle('hidden',!t);}
+async function getSync(q){const r=await fetch(S.sync.url+(q||''),{redirect:'follow'});const j=await r.json();if(!j.ok)throw new Error(j.error||'okänt fel');return j;}
+async function testSync(){if(!S.sync.url){toast('Klistra in länken först');return;}
+  try{const j=await getSync('?ping=1');toast(`Kopplat ✓ ${j.rows} rader i kalkylarket`);syncErr=null;scheduleSync(100);}
+  catch(e){modal(`<h3 style="margin-top:0">Kunde inte nå kalkylarket</h3><p class="muted">${esc(e.message||e)}</p><p class="muted">Kontrollera att länken slutar på /exec och att webbappen är publicerad med <b>Vem har åtkomst: Alla</b>.</p><button class="btn block" data-act="close">Stäng</button>`);}}
+async function pullSync(){if(!S.sync.url){toast('Klistra in länken först');return;}
+  try{const j=await getSync('');const latest={};
+    for(const r of j.rows){const k=keyOf(r.address);if(!latest[k]||r.updated>latest[k].updated)latest[k]=r;}
+    const rev=Object.fromEntries(Object.entries(PROBLEMS).map(([a,b])=>[b,a]));let n=0;const per=S.route&&S.route.meta.period;
+    for(const [k,r] of Object.entries(latest)){const h=S.houses[k]||(S.houses[k]={});if((h.updated||0)>=r.updated)continue;
+      if(r.vill!=null&&!isNaN(r.vill)){h.vill=r.vill;if(r.vill===0&&h.zeroSince==null)h.zeroSince=S.week.no;}
+      if(r.problem&&rev[r.problem])h.access=rev[r.problem];else delete h.access;
+      h.note=r.note||'';h.updated=r.updated;
+      if(per&&String(r.period)===String(per)){if(r.status==='Utdelat')S.week.done[k]='klar';else if(r.status==='Kom inte in')S.week.done[k]='ejin';}
+      n++;}
+    save();render();toast(n?`${n} hus uppdaterade från kalkylarket`:'Telefonen var redan uppdaterad');}
+  catch(e){toast('Kunde inte hämta: '+(e.message||e));}}
+addEventListener('online',()=>{syncErr=null;syncNow();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syncNow();});
+setInterval(()=>syncNow(),60000);
+
 // ======================= INLÄSNING =======================
 let pdfjs=null;
 async function loadPdfjs(){if(pdfjs)return pdfjs;const w=await import('./pdf.worker.min.js');globalThis.pdfjsWorker=w;pdfjs=await import('./pdf.min.js');return pdfjs;}
@@ -480,9 +537,11 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-file]')&&e.target.files[0]){importPdf(e.target.files[0]);e.target.value='';}
   if(e.target.matches('[data-act=smart]')){S.showAll=!e.target.checked;save();render();}
   if(e.target.matches('[data-city]')){S.city=e.target.value.trim()||'Linköping';save();}
+  if(e.target.matches('[data-syncurl]')){const u=e.target.value.trim();S.sync.url=u;save();syncUI();
+    if(u&&!/^https:\/\/script\.google\.com\/.+\/exec$/.test(u))toast('Länken ska börja med https://script.google.com och sluta på /exec');else if(u)testSync();}
 });
 let noteT=null;
-document.addEventListener('input',e=>{if(e.target.matches('[data-note]')){const k=e.target.dataset.note;const h=S.houses[k]||(S.houses[k]={});h.note=e.target.value;clearTimeout(noteT);noteT=setTimeout(save,400);}});
+document.addEventListener('input',e=>{if(e.target.matches('[data-note]')){const k=e.target.dataset.note;const h=S.houses[k]||(S.houses[k]={});h.note=e.target.value;clearTimeout(noteT);noteT=setTimeout(()=>touch(byKey(k)),600);}});
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-act],[data-tab]');if(!t||t.matches('input'))return;
   if(t.dataset.tab){tab=t.dataset.tab;open=null;render();scrollTo(0,0);return;}
@@ -490,17 +549,17 @@ document.addEventListener('click',async e=>{
   if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
   switch(a){
     case 'open':open=open===k?null:k;rerenderKeep();break;
-    case 'done':if(status(it)==='klar')delete S.week.done[k];else markDone(it);open=null;save();
+    case 'done':if(status(it)==='klar')delete S.week.done[k];else markDone(it);open=null;touch(it);
       if(map)map.closePopup();render();toast(status(it)==='klar'?'Klar ✓':'Ångrat');if(tab==='route')scrollNext();break;
-    case 'noentry':{S.week.done[k]='ejin';const h=H(it);if(!h.access)h.access=it.codes.some(missing)?'saknas':(it.tags.length&&!it.codes.length?'tagg':'kod');delete h.newCode;save();open=k;rerenderKeep();toast('Markerat – välj vad som var fel');break;}
-    case 'v+':setVill(it,(hOf(it).vill??Math.min(1,it.hh))+1);save();rerenderKeep();break;
-    case 'v-':setVill(it,(hOf(it).vill??Math.min(1,it.hh))-1);save();rerenderKeep();break;
-    case 'vn':setVill(it,+t.dataset.n);save();rerenderKeep();break;
-    case 'vall':setVill(it,it.hh);save();rerenderKeep();break;
-    case 'v0':setVill(it,0);save();rerenderKeep();break;
-    case 'prob':{const h=H(it);if(h.access===t.dataset.p)delete h.access;else h.access=t.dataset.p;delete h.newCode;save();rerenderKeep();break;}
-    case 'probclear':{const h=H(it);delete h.access;if(status(it)==='ejin')delete S.week.done[k];save();rerenderKeep();break;}
-    case 'unskip':{const h=H(it);delete h.access;if(h.vill===0){h.zeroSince=S.week.no-CHECK_EVERY;}save();render();toast('Tas med i rutten');break;}
+    case 'noentry':{S.week.done[k]='ejin';const h=H(it);if(!h.access)h.access=it.codes.some(missing)?'saknas':(it.tags.length&&!it.codes.length?'tagg':'kod');delete h.newCode;touch(it);open=k;rerenderKeep();toast('Markerat – välj vad som var fel');break;}
+    case 'v+':setVill(it,(hOf(it).vill??Math.min(1,it.hh))+1);touch(it);rerenderKeep();break;
+    case 'v-':setVill(it,(hOf(it).vill??Math.min(1,it.hh))-1);touch(it);rerenderKeep();break;
+    case 'vn':setVill(it,+t.dataset.n);touch(it);rerenderKeep();break;
+    case 'vall':setVill(it,it.hh);touch(it);rerenderKeep();break;
+    case 'v0':setVill(it,0);touch(it);rerenderKeep();break;
+    case 'prob':{const h=H(it);h.access=t.dataset.p;delete h.newCode;touch(it);rerenderKeep();break;}
+    case 'probclear':{const h=H(it);delete h.access;if(status(it)==='ejin')delete S.week.done[k];touch(it);rerenderKeep();break;}
+    case 'unskip':{const h=H(it);delete h.access;if(h.vill===0){h.zeroSince=S.week.no-CHECK_EVERY;}touch(it);render();toast('Tas med i rutten');break;}
     case 'onmap':case 'move':tab='map';open=null;render();if(a==='move'||!posOf(it)){moveKey=k;if(map)map.closePopup();banner();if(!posOf(it))toast('Tryck på kartan där huset ligger');}
       else{map&&map.setView(posOf(it),18);}break;
     case 'movecancel':moveKey=null;banner();break;
@@ -515,15 +574,18 @@ document.addEventListener('click',async e=>{
     case 'backup':try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Säkerhetskopia kopierad');}catch(_){modal(`<h3 style="margin-top:0">Säkerhetskopia</h3><textarea readonly style="min-height:160px">${esc(JSON.stringify(S))}</textarea><div class="row"><button class="btn" data-act="close">Stäng</button></div>`);}break;
     case 'restore':modal(`<h3 style="margin-top:0">Återställ säkerhetskopia</h3><textarea id="restoreTxt" style="min-height:140px" placeholder="Klistra in här"></textarea><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="dorestore">Återställ</button></div>`);break;
     case 'dorestore':try{const o=JSON.parse($('#restoreTxt').value);if(!o||typeof o!=='object'||!('houses' in o))throw 0;S=Object.assign(blank(),o);save();closeModal();fitted=false;render();toast('Återställt');}catch(_){toast('Ogiltig säkerhetskopia');}break;
+    case 'synctest':testSync();break;
+    case 'syncall':{if(!S.route)break;let n=0;for(const i of items()){const h=hOf(i);if(status(i)||h.vill!=null||h.access||h.note){S.sync.queue[(S.route.meta.period||'')+'|'+keyOf(i.address)]=rowFor(i);n++;}}save();toast(n?`${n} hus skickas`:'Inget rapporterat den här veckan');scheduleSync(100);break;}
+    case 'syncpull':pullSync();break;
     case 'close':closeModal();break;
   }
 });
-$('#dockDone').addEventListener('click',()=>{const it=byKey($('#dock').dataset.k);if(!it)return;markDone(it);save();if(map)map.closePopup();render();toast('Klar ✓');if(tab==='route')scrollNext();});
+$('#dockDone').addEventListener('click',()=>{const it=byKey($('#dock').dataset.k);if(!it)return;markDone(it);touch(it);if(map)map.closePopup();render();toast('Klar ✓');if(tab==='route')scrollNext();});
 $('#dockMap').addEventListener('click',()=>{const k=$('#dock').dataset.k,it=byKey(k);if(tab==='map'){tab='route';open=k;render();setTimeout(()=>document.getElementById(idOf(k))?.scrollIntoView({block:'start'}),30);}else{tab='map';render();if(it&&posOf(it)&&map)map.setView(posOf(it),18);}});
 function scrollNext(){const n=nextItem();if(!n)return;document.getElementById(idOf(keyOf(n.address)))?.scrollIntoView({behavior:'smooth',block:'center'});}
 function selectReport(){const el=$('#reportText');if(!el)return;const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);}
 
-load();render();if(S.route)geocodeAll(false);
+load();render();syncUI();syncNow();if(S.route)geocodeAll(false);
 </script>
 </body>
 </html>

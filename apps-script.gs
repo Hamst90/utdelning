@@ -18,6 +18,20 @@ const KOLUMNER = ['Period', 'Datum', 'Distrikt', 'Nr', 'Adress', 'Hushåll', 'Vi
   'Status', 'Problem', 'Anteckning', 'Uppdaterad', 'Nyckel'];
 const NYCKEL_KOL = KOLUMNER.length; // sista kolumnen
 const MAPPNAMN = 'Utdelning – adresslistor';
+const PLATS_FLIK = 'Platser';
+const PLATS_KOLUMNER = ['Adress', 'Lat', 'Lon', 'Manuell', 'Uppdaterad'];
+
+/** Fliken med kartplatser, delade mellan telefonerna så att adresserna bara behöver sökas en gång. */
+function platsFlik_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(PLATS_FLIK);
+  if (!sh) {
+    sh = ss.insertSheet(PLATS_FLIK);
+    sh.getRange(1, 1, 1, PLATS_KOLUMNER.length).setValues([PLATS_KOLUMNER]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
 
 function pinOk_(pin) {
   const ratt = PropertiesService.getScriptProperties().getProperty('PIN');
@@ -77,6 +91,22 @@ function doPost(e) {
       const fil = mapp_().createFile(Utilities.newBlob(Utilities.base64Decode(data.data), 'application/pdf', namn));
       return svar_({ ok: true, id: fil.getId() });
     }
+    if (data.action === 'places') {
+      if (!pinOk_(data.pin)) return svar_({ ok: false, error: 'PIN' });
+      const sh = platsFlik_(), sista = sh.getLastRow(), index = {}, manuell = {};
+      if (sista > 1) sh.getRange(2, 1, sista - 1, 4).getValues().forEach((r, i) => { index[r[0]] = i + 2; manuell[r[0]] = r[3] === true || r[3] === 'ja'; });
+      const nya = [];
+      Object.keys(data.places || {}).forEach(k => {
+        const v = data.places[k];
+        if (!v || typeof v.lat !== 'number' || typeof v.lon !== 'number') return;
+        if (manuell[k] && !v.manual) return; // en handplacerad nål skrivs inte över av adressökningen
+        const rad = [text_(k), v.lat, v.lon, v.manual ? 'ja' : '', new Date()];
+        if (index[k]) sh.getRange(index[k], 1, 1, rad.length).setValues([rad]);
+        else { nya.push(rad); index[k] = -1; }
+      });
+      if (nya.length) sh.getRange(sh.getLastRow() + 1, 1, nya.length, PLATS_KOLUMNER.length).setValues(nya);
+      return svar_({ ok: true });
+    }
     const rader = Array.isArray(data.rows) ? data.rows : [];
     const sh = flik_();
     const sista = sh.getLastRow();
@@ -110,6 +140,7 @@ function doPost(e) {
  *   ?pin=…                 rapportraderna (för att återställa på en ny telefon)
  *   ?action=lists&pin=…    adresslistorna (PDF) i Drive-mappen
  *   ?action=pdf&id=…&pin=… en adresslista, base64-kodad
+ *   ?action=places&pin=…   delade kartplatser
  * ?ping=1 svarar bara med antalet rader (för att testa kopplingen).
  */
 function doGet(e) {
@@ -127,6 +158,13 @@ function doGet(e) {
     }
     filer.sort((a, b) => b.modified - a.modified);
     return svar_({ ok: true, files: filer });
+  }
+  if (p.action === 'places') {
+    const ps = platsFlik_(), n = ps.getLastRow(), platser = {};
+    if (n > 1) ps.getRange(2, 1, n - 1, 4).getValues().forEach(r => {
+      if (r[0] && r[1] !== '' && r[2] !== '') platser[String(r[0]).replace(/^'/, '')] = [Number(r[1]), Number(r[2]), r[3] === 'ja' ? 1 : 0];
+    });
+    return svar_({ ok: true, places: platser });
   }
   if (p.action === 'pdf') {
     const f = DriveApp.getFileById(p.id);

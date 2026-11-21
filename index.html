@@ -208,6 +208,8 @@ html:has(body.home-mode),body.home-mode{overflow:hidden;overscroll-behavior:none
 body.home-mode{padding-bottom:0}
 body.home-mode .home{min-height:0;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2px);box-sizing:border-box;padding:6dvh 6px 12px;overflow:hidden}
 body.home-mode .home .logo{font-size:min(56px,8dvh)}
+/* Ingen dra-för-att-ladda-om: allt sparas direkt och nya listor har en egen Uppdatera-knapp */
+html,body{overscroll-behavior-y:none}
 </style>
 </head>
 <body>

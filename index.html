@@ -167,20 +167,23 @@ details.more summary{padding:8px 0;font-weight:600;color:var(--muted);cursor:poi
 .modal{z-index:3000}
 #mapWrap{z-index:0;isolation:isolate}
 .pin.unsure{border:2px dashed #e9a23b}
+.topbar{display:flex;gap:8px;align-items:center;margin:10px 0}
+.topbar nav.tabs{flex:1;margin:0}
+.topbar .iconbtn{height:46px;width:46px}
+.invisible{visibility:hidden}
+body{padding-top:calc(env(safe-area-inset-top) + 2px)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header class="top">
-    <div class="tl"><h1 id="title">Utdelningsrutt</h1><div class="sub" id="subtitle">Ingen adresslista inläst</div></div>
+  <div class="hidden" aria-hidden="true"><span id="title"></span><span id="subtitle"></span><i id="bar"></i></div>
+  <div class="topbar" id="topbar">
+    <nav class="tabs" id="tabs" role="tablist">
+      <button role="tab" data-tab="map" aria-selected="true">Karta</button>
+      <button role="tab" data-tab="route" aria-selected="false">Rutt</button>
+    </nav>
     <button class="iconbtn" data-act="menu" aria-label="Meny">☰</button>
-  </header>
-  <div class="progress"><i id="bar"></i></div>
-  <div class="sync hidden" id="syncStatus"></div>
-  <nav class="tabs hidden" id="tabs" role="tablist">
-    <button role="tab" data-tab="map" aria-selected="true">Karta</button>
-    <button role="tab" data-tab="route" aria-selected="false">Rutt</button>
-  </nav>
+  </div>
   <div class="backbar hidden" id="backbar"><button class="btn small" data-tab="map">‹ Tillbaka</button><b id="backTitle"></b></div>
   <div id="mapWrap" class="hidden">
     <div id="map"></div>
@@ -310,7 +313,7 @@ function render(){
   $('#subtitle').textContent=has?`${doneN} av ${act.length} hus · ${ex} av ${exTot} ex`+(skipN?` · ${skipN} hoppas över`:''):'Ingen adresslista inläst';
   $('#bar').style.width=act.length?(100*doneN/act.length)+'%':'0';
   const main=tab==='map'||tab==='route';
-  $('#tabs').classList.toggle('hidden',!has||!main);
+  $('#tabs').classList.toggle('invisible',!has);$('#topbar').classList.toggle('hidden',!main);
   document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
   $('#backbar').classList.toggle('hidden',main);
   $('#backTitle').textContent=tab==='report'?'Rapport':tab==='setup'?'Inställningar':'';
@@ -325,6 +328,7 @@ function render(){
   dock(main?nextItem():null);
   if(showMap){sizeMap();drawMap();}
   if(sheetKey)refreshSheet();
+  syncUI();
 }
 function emptyHTML(){return `<div class="empty"><h2>Läs in veckans adresslista</h2><p>Välj PDF:en från utdelare.nu. Listan läses direkt i telefonen – portkoderna skickas ingenstans.</p>
   <label class="btn primary file">Välj PDF…<input type="file" accept="application/pdf,.pdf" data-file></label>
@@ -358,6 +362,7 @@ function setupHTML(){const m=S.route&&S.route.meta;const miss=S.route?items().fi
     <p class="muted" style="font-size:13px;margin:10px 0 0">Det hon rapporterat (vill ha reklam, problem med kod) sparas mellan veckorna. En ny period nollställer bara bockarna. Byts koden i listan för ett hus med kodproblem tas huset med igen och märks ”Ny kod”. Hus där ingen vill ha reklam tas med för kontroll var ${CHECK_EVERY}:e vecka, eller direkt om antalet hushåll ändras i listan.</p>
   </div></div>
   <div class="section-title">Kalkylark</div><div class="card static"><div class="body">
+    <div class="sync hidden" id="syncStatus" style="margin:0 0 8px;font-size:14px"></div>
     <label class="lbl" style="margin-top:0">Skriptets webbappslänk (slutar på /exec)</label>
     <input type="text" data-syncurl value="${esc(S.sync.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <div class="row"><button class="btn" data-act="synctest">Testa kopplingen</button><button class="btn" data-act="syncall">Skicka allt igen</button></div>

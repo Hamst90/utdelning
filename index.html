@@ -203,6 +203,11 @@ body{padding-top:calc(env(safe-area-inset-top) + 2px)}
 .linkbtn{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:15px;padding:8px}
 .a2hs{max-width:420px;width:100%;text-align:left;font-size:14px;background:var(--info-soft);border-radius:14px;padding:12px 14px;margin-top:6px}
 .a2hs b{display:block;margin-bottom:2px}
+/* Startsidan ska inte gå att skrolla */
+html:has(body.home-mode),body.home-mode{overflow:hidden;overscroll-behavior:none;height:100%}
+body.home-mode{padding-bottom:0}
+body.home-mode .home{min-height:0;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2px);box-sizing:border-box;padding:6dvh 6px 12px;overflow:hidden}
+body.home-mode .home .logo{font-size:min(56px,8dvh)}
 </style>
 </head>
 <body>
@@ -401,6 +406,7 @@ function render(){
   const showMap=has&&tab==='map';
   $('#mapWrap').classList.toggle('hidden',!showMap);
   const v=$('#view');
+  document.body.classList.toggle('home-mode',tab==='home');
   if(tab==='home'){v.innerHTML=homeHTML();dock(null);return;}
   if(tab==='pin'){v.innerHTML=pinHTML();dock(null);setTimeout(()=>$('#pinStart')?.focus(),50);return;}
   if(tab==='weeks'){v.innerHTML=weeksHTML();dock(null);return;}

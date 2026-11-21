@@ -124,39 +124,74 @@ pre.report{white-space:pre-wrap;background:var(--card);border:1px solid var(--li
 .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:6px 2px 12px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.2)}
 
+
+/* ---- v3 layout ---- */
+header.top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0 6px}
+header.top h1{font-size:19px}
+header.top .sub{font-size:13px}
+.iconbtn{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:20px;display:flex;align-items:center;justify-content:center;flex:none}
+.progress{margin:4px 0 2px;height:6px}
+.sync{margin:4px 0 0}
+nav.tabs{margin:10px 0 10px}
+.backbar{display:flex;align-items:center;gap:12px;margin:10px 0 12px}
+.backbar b{font-size:18px}
+button.card{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;padding:12px 14px;font:inherit;color:inherit}
+.card.static .body{padding:14px}
+.cbody{flex:1;min-width:0}
+.flags{margin-top:2px}
+.dock{padding:10px 14px calc(12px + env(safe-area-inset-bottom))}
+.dock .in{flex-direction:column;align-items:stretch;gap:8px}
+.dock .what{display:block;width:100%;text-align:left;border:0;background:transparent;padding:0;font:inherit;color:inherit}
+.dock .what .addr{font-size:19px;white-space:normal}
+.dock .chips{margin-top:6px}
+.dock .chip{font-size:17px;padding:8px 10px}
+.dbtns{display:flex;gap:8px}
+.dbtns .btn{flex:1;padding:12px}
+body.has-dock{padding-bottom:calc(env(safe-area-inset-bottom) + 200px)}
+body.noscroll{overflow:hidden}
+.modal .sheet{max-height:88dvh;overflow:auto;-webkit-overflow-scrolling:touch;padding-top:8px}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 10px}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px}
+.addr.big{font-size:22px;font-weight:700;line-height:1.2}
+.btn.big{width:100%;padding:15px;font-size:18px}
+details.more{margin-top:14px;border-top:1px solid var(--line);padding-top:6px}
+details.more summary{padding:8px 0;font-weight:600;color:var(--muted);cursor:pointer}
+.menuitem{display:flex;gap:14px;align-items:center;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:transparent;padding:14px 4px;font:inherit;color:inherit;position:relative}
+.menuitem span{font-size:22px;width:28px;text-align:center}
+.menuitem .muted{font-size:13px}
+.menuitem.file input{position:absolute;inset:0;opacity:0}
+.map-tools .btn{width:42px;height:42px;padding:0;font-size:18px}
+#map{min-height:300px}
+.toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px);z-index:3100;max-width:90vw;text-align:center}
+.dock{z-index:1100}
+.modal{z-index:3000}
+#mapWrap{z-index:0;isolation:isolate}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1 id="title">Utdelningsrutt</h1>
-    <div class="sub" id="subtitle">Ingen adresslista inläst</div>
-    <div class="progress"><i id="bar"></i></div>
-    <div class="stats" id="stats"></div>
-    <div class="sync hidden" id="syncStatus"></div>
+  <header class="top">
+    <div class="tl"><h1 id="title">Utdelningsrutt</h1><div class="sub" id="subtitle">Ingen adresslista inläst</div></div>
+    <button class="iconbtn" data-act="menu" aria-label="Meny">☰</button>
   </header>
-  <nav class="tabs" role="tablist">
-    <button role="tab" data-tab="route" aria-selected="true">Rutt</button>
-    <button role="tab" data-tab="map" aria-selected="false">Karta</button>
-    <button role="tab" data-tab="report" aria-selected="false">Rapport</button>
-    <button role="tab" data-tab="setup" aria-selected="false">Lista</button>
+  <div class="progress"><i id="bar"></i></div>
+  <div class="sync hidden" id="syncStatus"></div>
+  <nav class="tabs hidden" id="tabs" role="tablist">
+    <button role="tab" data-tab="map" aria-selected="true">Karta</button>
+    <button role="tab" data-tab="route" aria-selected="false">Rutt</button>
   </nav>
+  <div class="backbar hidden" id="backbar"><button class="btn small" data-tab="map">‹ Tillbaka</button><b id="backTitle"></b></div>
   <div id="mapWrap" class="hidden">
     <div id="map"></div>
     <div class="map-banner hidden" id="mapBanner"></div>
     <div class="map-tools">
-      <button class="btn small" id="btnMe" aria-label="Min position">◎ Jag</button>
-      <button class="btn small" id="btnFit" aria-label="Visa hela rutten">⤢ Allt</button>
+      <button class="btn small" id="btnMe" aria-label="Min position">◎</button>
+      <button class="btn small" id="btnFit" aria-label="Visa hela rutten">⤢</button>
     </div>
   </div>
-  <div class="legend hidden" id="legend"><span><i style="background:#1f5f4a"></i>Nästa</span><span><i style="background:#fff"></i>Kvar</span><span><i style="background:#7fb59c"></i>Klar</span><span><i style="background:#a3262a"></i>Kom inte in</span><span><i style="background:#e9a23b"></i>Kontrollera</span><span><i style="background:#b9b4ab"></i>Hoppas över</span></div>
   <main id="view"></main>
 </div>
-<div class="dock hidden" id="dock"><div class="in">
-  <div class="what"><div class="meta">Nästa</div><div class="addr" id="dockAddr"></div><div class="meta" id="dockMeta"></div></div>
-  <button class="btn small" id="dockMap">Karta</button>
-  <button class="btn primary" id="dockDone">Klar ✓</button>
-</div></div>
+<div class="dock hidden" id="dock"><div class="in" id="dockInner"></div></div>
 <div class="toast" id="toast"></div>
 <div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
 <script>
@@ -224,13 +259,14 @@ function blank(){return {v:2,updatedAt:0,city:'Linköping',route:null,houses:{},
 let S=blank();
 function load(){try{const j=localStorage.getItem(LS);if(j)S=Object.assign(blank(),JSON.parse(j));}catch(e){}}
 function save(){S.updatedAt=Date.now();try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){toast('Kunde inte spara i telefonen');}}
-let tab='route',open=null;
+let tab='map',open=null,sheetKey=null;
 
 // ---------- modell ----------
 const items=()=>S.route?S.route.items.slice().sort((a,b)=>(a.order??0)-(b.order??0)):[];
 const H=it=>S.houses[keyOf(it.address)]||(S.houses[keyOf(it.address)]={});
 const hOf=it=>S.houses[keyOf(it.address)]||{};
 const status=it=>S.week.done[keyOf(it.address)]||null;
+const nrOf=it=>items().indexOf(it)+1;
 function want(it){const h=hOf(it);return h.vill==null?it.hh:Math.min(h.vill,it.hh);}
 function checkDue(it){const h=hOf(it);return h.vill===0&&(h.hhChanged||(S.week.no-(h.zeroSince??S.week.no))>=CHECK_EVERY);}
 function skipReason(it){
@@ -243,34 +279,9 @@ const active=()=>items().filter(i=>S.showAll||!skipReason(i));
 const nextItem=()=>active().find(i=>!status(i));
 function setVill(it,v){const h=H(it);v=Math.max(0,Math.min(it.hh,v));if(v===0&&h.vill!==0)h.zeroSince=S.week.no;if(v===0&&checkDue(it))h.zeroSince=S.week.no;h.vill=v;delete h.hhChanged;}
 function markDone(it){const k=keyOf(it.address),h=H(it);S.week.done[k]='klar';delete h.access;delete h.newCode;delete h.hhChanged;if(h.vill===0)h.zeroSince=S.week.no;}
-
-// ---------- kartlänkar ----------
 const mapsURL=it=>{const p=posOf(it);return p?`https://maps.apple.com/?daddr=${p[0]},${p[1]}&dirflg=w`:'https://maps.apple.com/?daddr='+encodeURIComponent(it.address+', '+S.city)+'&dirflg=w';};
 
-// ---------- render ----------
-function render(){
-  const all=items(),act=active(),m=S.route&&S.route.meta||{};
-  $('#title').textContent=m.district?'Distrikt '+m.district:'Utdelningsrutt';
-  $('#subtitle').textContent=S.route?(m.date||'')+' · '+all.length+' adresser':'Ingen adresslista inläst';
-  const doneN=act.filter(status).length;
-  $('#bar').style.width=act.length?(100*doneN/act.length)+'%':'0';
-  const ex=act.filter(i=>status(i)==='klar').reduce((s,i)=>s+want(i),0),exTot=act.reduce((s,i)=>s+want(i),0);
-  const skipN=all.filter(skipReason).length;
-  $('#stats').innerHTML=S.route?`<span><b>${doneN}</b> av ${act.length} hus</span><span><b>${ex}</b> av ${exTot} ex</span>`+(skipN?`<span><b>${skipN}</b> hoppas över</span>`:''):'';
-  document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
-  const v=$('#view'),showMap=tab==='map'&&S.route;
-  $('#mapWrap').classList.toggle('hidden',!showMap);$('#legend').classList.toggle('hidden',!showMap);
-  if(!S.route&&tab!=='setup'){v.innerHTML=emptyHTML();dock(null);return;}
-  if(tab==='route')v.innerHTML=routeHTML(all,act);
-  else if(tab==='map')v.innerHTML='';
-  else if(tab==='report')v.innerHTML=reportHTML();
-  else v.innerHTML=setupHTML();
-  dock(tab==='route'||tab==='map'?nextItem():null);
-  if(showMap)drawMap();
-}
-function emptyHTML(){return `<div class="empty"><h2>Läs in veckans adresslista</h2><p>Välj PDF:en från utdelare.nu. Listan läses direkt i telefonen – portkoderna skickas ingenstans.</p>
-  <label class="btn primary file">Välj PDF…<input type="file" accept="application/pdf,.pdf" data-file></label>
-  <ol class="howto"><li>Logga in på utdelare.nu och öppna adresslistan.</li><li>Tryck på dela-knappen → <b>Spara i Filer</b>.</li><li>Kom tillbaka hit och välj filen.</li></ol></div>`;}
+// ---------- gemensamma bitar ----------
 function chipsHTML(it){let c='';
   for(const k of it.codes){const mm=k.match(/^(Grind|Port);\s*(.+)$/);const lbl=mm?mm[1]:'Kod',val=mm?mm[2]:k;c+=`<span class="chip${missing(val)?' miss':''}"><small>${lbl}</small>${missing(val)?'saknas':esc(val)}</span>`;}
   for(const t of it.tags)c+=`<span class="chip"><small>Tagg</small>${esc(t)}</span>`;
@@ -284,100 +295,136 @@ function flagsHTML(it){const h=hOf(it),st=status(it);let f='';
   if(st==='ejin')f+=`<span class="flag bad">Kom inte in i dag</span>`;
   if(skipReason(it)&&S.showAll)f+=`<span class="flag warn">Hoppas över i smart rutt</span>`;
   if(S.route&&S.geoDone&&!posOf(it))f+=`<span class="flag warn">Saknar plats på kartan</span>`;
-  return f;}
-function cardHTML(it,isNext,n){
-  const k=keyOf(it.address),h=hOf(it),st=status(it),w=want(it),isOpen=open===k,f=flagsHTML(it);
-  let body='';
-  if(isOpen){const v=h.vill??Math.min(1,it.hh);
-    body=`<div class="body">
-      ${it.group?`<div class="note">${esc(it.group)}</div>`:''}
-      ${it.notes.length?`<div class="note plain">${esc(it.notes.join(' '))}</div>`:''}
-      <div class="row">
-        <button class="btn ${st==='klar'?'':'primary'}" data-act="done" data-k="${esc(k)}">${st==='klar'?'Ångra klar':'Utdelat ✓'}</button>
-        <button class="btn warn" data-act="noentry" data-k="${esc(k)}">Kom inte in</button>
-      </div>
-      <div class="row"><a class="btn small" href="${mapsURL(it)}" target="_blank" rel="noopener">Vägbeskrivning</a><button class="btn small" data-act="onmap" data-k="${esc(k)}">Visa på kartan</button></div>
-      <label class="lbl">Hur många av ${it.hh} hushåll vill ha reklam?</label>
-      <div class="stepper"><button data-act="v-" data-k="${esc(k)}" aria-label="Minska">−</button><output>${v}</output><button data-act="v+" data-k="${esc(k)}" aria-label="Öka">+</button>
-        <span class="muted" style="font-size:14px">${h.vill==null?'inte sparat än – tryck en knapp':''}</span></div>
-      <div class="opts"><button class="opt" aria-pressed="${h.vill===0}" data-act="v0" data-k="${esc(k)}">Ingen</button>${[1,2].filter(n=>n<it.hh).map(n=>`<button class="opt good" aria-pressed="${h.vill===n}" data-act="vn" data-n="${n}" data-k="${esc(k)}">${n}</button>`).join('')}<button class="opt good" aria-pressed="${h.vill===it.hh}" data-act="vall" data-k="${esc(k)}">Alla ${it.hh}</button></div>
-      <label class="lbl">Problem att komma in</label>
-      <div class="opts">${Object.entries(PROBLEMS).map(([p,t])=>`<button class="opt" aria-pressed="${h.access===p}" data-act="prob" data-p="${p}" data-k="${esc(k)}">${t}</button>`).join('')}
-        ${h.access?`<button class="opt good" aria-pressed="true" data-act="probclear" data-k="${esc(k)}">Fungerar nu</button>`:''}</div>
-      <label class="lbl">Anteckning (kommer med i rapporten)</label>
-      <textarea data-note="${esc(k)}" placeholder="t.ex. ny kod står på dörren, porten öppen till 16">${esc(h.note||'')}</textarea>
-    </div>`;}
-  return `<div class="card${st?' done':''}${isNext?' next':''}" id="${idOf(k)}">
-    <button class="card-head" data-act="open" data-k="${esc(k)}">
-      <div class="ord">${st==='klar'?'✓':n}</div>
-      <div style="flex:1;min-width:0"><div class="addr">${esc(it.address)}</div>
-        <div class="meta">${it.hh} hushåll · <span class="give">ge ut ${w} ex</span>${h.vill!=null&&h.vill<it.hh?` <span class="muted">(${it.hh-h.vill} vill inte)</span>`:''}</div>
-        ${chipsHTML(it)}${f?`<div>${f}</div>`:''}
-        ${!isOpen&&(it.group||it.notes.length)?`<div class="peek">ℹ︎ ${esc((it.notes[0]||it.group).split('/')[0])}</div>`:''}</div>
-    </button>${body}</div>`;}
+  return f?`<div class="flags">${f}</div>`:'';}
+const wantLine=it=>{const h=hOf(it);return `${it.hh} hushåll · <span class="give">ge ut ${want(it)} ex</span>${h.vill==null?' <span class="muted">(ej rapporterat)</span>':''}`;};
+
+// ---------- render ----------
+function render(){
+  const all=items(),act=active(),m=S.route&&S.route.meta||{},has=!!S.route;
+  $('#title').textContent=m.district?'Distrikt '+m.district:'Utdelningsrutt';
+  const doneN=act.filter(status).length;
+  const ex=act.filter(i=>status(i)==='klar').reduce((s,i)=>s+want(i),0),exTot=act.reduce((s,i)=>s+want(i),0);
+  const skipN=all.filter(skipReason).length;
+  $('#subtitle').textContent=has?`${doneN} av ${act.length} hus · ${ex} av ${exTot} ex`+(skipN?` · ${skipN} hoppas över`:''):'Ingen adresslista inläst';
+  $('#bar').style.width=act.length?(100*doneN/act.length)+'%':'0';
+  const main=tab==='map'||tab==='route';
+  $('#tabs').classList.toggle('hidden',!has||!main);
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));
+  $('#backbar').classList.toggle('hidden',main);
+  $('#backTitle').textContent=tab==='report'?'Rapport':tab==='setup'?'Inställningar':'';
+  const showMap=has&&tab==='map';
+  $('#mapWrap').classList.toggle('hidden',!showMap);
+  const v=$('#view');
+  if(!has&&main){v.innerHTML=emptyHTML();dock(null);return;}
+  if(tab==='route')v.innerHTML=routeHTML(all,act);
+  else if(tab==='map')v.innerHTML='';
+  else if(tab==='report')v.innerHTML=reportHTML();
+  else v.innerHTML=setupHTML();
+  dock(main?nextItem():null);
+  if(showMap){sizeMap();drawMap();}
+  if(sheetKey)refreshSheet();
+}
+function emptyHTML(){return `<div class="empty"><h2>Läs in veckans adresslista</h2><p>Välj PDF:en från utdelare.nu. Listan läses direkt i telefonen – portkoderna skickas ingenstans.</p>
+  <label class="btn primary file">Välj PDF…<input type="file" accept="application/pdf,.pdf" data-file></label>
+  <ol class="howto"><li>Logga in på utdelare.nu och öppna adresslistan.</li><li>Tryck på dela-knappen → <b>Spara i Filer</b>.</li><li>Kom tillbaka hit och välj filen.</li></ol></div>`;}
+function cardHTML(it,isNext){
+  const k=keyOf(it.address),st=status(it);
+  return `<button class="card${st?' done':''}${isNext?' next':''}" id="${idOf(k)}" data-act="house" data-k="${esc(k)}">
+      <div class="ord">${st==='klar'?'✓':nrOf(it)}</div>
+      <div class="cbody"><div class="addr">${esc(it.address)}</div>
+        <div class="meta">${wantLine(it)}</div>
+        ${chipsHTML(it)}${flagsHTML(it)}
+        ${(it.group||it.notes.length)?`<div class="peek">ℹ︎ ${esc((it.notes[0]||it.group).split('/')[0])}</div>`:''}</div>
+    </button>`;}
 function routeHTML(all,act){
   const nx=nextItem(),remaining=act.filter(i=>!status(i));
-  let h=`<div class="toolbar"><label class="toggle"><input type="checkbox" data-act="smart" ${S.showAll?'':'checked'}> Smart rutt</label></div>`;
-  if(!act.length)h+=`<div class="empty"><p>Alla adresser hoppas över. Slå av Smart rutt för att se dem.</p></div>`;
-  h+=act.map(i=>cardHTML(i,nx&&i===nx,all.indexOf(i)+1)).join('');
+  let h='';
+  if(!act.length)h+=`<div class="empty"><p>Alla adresser hoppas över. Slå av Smart rutt i menyn för att se dem.</p></div>`;
+  h+=act.map(i=>cardHTML(i,nx&&i===nx)).join('');
   if(!S.showAll){const sk=all.filter(skipReason);
     if(sk.length)h+=`<details class="skipped"><summary>Hoppas över (${sk.length})</summary>${sk.map(i=>`<div class="skip-item"><div><b>${esc(i.address)}</b><div class="muted">${esc(skipReason(i))}</div></div><button class="btn small" data-act="unskip" data-k="${esc(keyOf(i.address))}">Ta med</button></div>`).join('')}</details>`;}
-  if(!remaining.length&&act.length)h+=`<div class="empty"><h2>Klart för i dag! 🎉</h2><p>Gå till Rapport för att skicka till din arbetsgivare.</p></div>`;
+  if(!remaining.length&&act.length)h+=doneHTML();
   return h;}
-function reportText(){
-  const m=S.route.meta||{},all=items(),act=active(),done=act.filter(i=>status(i)==='klar');
-  let t=`Rapport distrikt ${m.district||''}${m.period?', period '+m.period:''}\n${m.date||''}\n\nUtdelat: ${done.length} av ${act.length} adresser, ${done.reduce((s,i)=>s+want(i),0)} ex.\n`;
-  const probs=all.filter(i=>hOf(i).access||status(i)==='ejin'||(i.codes.some(missing)&&status(i)!=='klar'));
-  t+=`\nÅTKOMSTPROBLEM (${probs.length})\n`+(probs.length?'':'Inga.\n');
-  for(const i of probs){const h=hOf(i);const what=h.access?PROBLEMS[h.access]:(i.codes.some(missing)?'Kod saknas i listan':'Kom inte in');
-    const cur=[...i.codes.filter(c=>!missing(c)).map(c=>'kod '+c),...i.tags.map(x=>'tagg '+x)].join(', ');
-    t+=`- ${i.address}: ${what}${cur?' (i listan: '+cur+')':''}${h.note?'. '+h.note:''}\n`;}
-  const rep=all.filter(i=>hOf(i).vill!=null&&hOf(i).vill<i.hh);
-  const sumH=all.reduce((s,i)=>s+i.hh,0),sumW=all.reduce((s,i)=>s+want(i),0);
-  t+=`\nVILL HA REKLAM\nBehov: ${sumW} ex av ${sumH} hushåll i distriktet.\n`;
-  for(const i of rep)t+=`- ${i.address}: ${hOf(i).vill} av ${i.hh} vill ha${hOf(i).vill===0?' (ingen)':''}\n`;
-  const other=all.filter(i=>hOf(i).note&&!probs.includes(i));
-  if(other.length){t+=`\nÖVRIGT\n`;for(const i of other)t+=`- ${i.address}: ${hOf(i).note}\n`;}
-  return t;}
-function reportHTML(){return `<div class="toolbar"><button class="btn primary" data-act="copy">Kopiera rapport</button><button class="btn" data-act="savefile">Spara som fil</button></div>
+const doneHTML=()=>`<div class="empty"><h2>Klart för i dag! 🎉</h2><p>Rapporten till arbetsgivaren finns i menyn.</p><button class="btn primary" data-go="report">Visa rapport</button></div>`;
+function reportHTML(){if(!S.route)return `<div class="empty"><p>Ingen adresslista inläst.</p></div>`;
+  return `<div class="toolbar"><button class="btn primary" data-act="copy">Kopiera rapport</button><button class="btn" data-act="savefile">Spara som fil</button></div>
   <p class="muted" style="font-size:14px;margin:0 0 10px">Kopiera och klistra in i ett mejl eller sms till arbetsgivaren.</p><pre class="report" id="reportText">${esc(reportText())}</pre>`;}
 function setupHTML(){const m=S.route&&S.route.meta;const miss=S.route?items().filter(i=>!posOf(i)).length:0;
-  return `<div class="section-title">Adresslista</div><div class="card"><div class="body" style="padding-top:14px">
+  return `<div class="section-title">Adresslista</div><div class="card static"><div class="body">
     ${m?`<div><b>Distrikt ${esc(m.district||'')}</b> · period ${esc(m.period||'')}</div><div class="muted" style="font-size:14px">${S.route.items.length} adresser · inläst ${new Date(S.route.importedAt).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})}${miss?` · ${miss} saknar plats på kartan`:''}</div>`:'<div class="muted">Ingen lista inläst ännu.</div>'}
     <div class="row"><label class="btn primary file">Läs in ny vecka (PDF)…<input type="file" accept="application/pdf,.pdf" data-file></label></div>
     <p class="muted" style="font-size:13px;margin:10px 0 0">Det hon rapporterat (vill ha reklam, problem med kod) sparas mellan veckorna. En ny period nollställer bara bockarna. Byts koden i listan för ett hus med kodproblem tas huset med igen och märks ”Ny kod”. Hus där ingen vill ha reklam tas med för kontroll var ${CHECK_EVERY}:e vecka, eller direkt om antalet hushåll ändras i listan.</p>
   </div></div>
-  <div class="section-title">Kalkylark</div><div class="card"><div class="body" style="padding-top:4px">
-    <label class="lbl">Skriptets webbappslänk (slutar på /exec)</label>
+  <div class="section-title">Kalkylark</div><div class="card static"><div class="body">
+    <label class="lbl" style="margin-top:0">Skriptets webbappslänk (slutar på /exec)</label>
     <input type="text" data-syncurl value="${esc(S.sync.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <div class="row"><button class="btn" data-act="synctest">Testa kopplingen</button><button class="btn" data-act="syncall">Skicka allt igen</button></div>
     <div class="row"><button class="btn" data-act="syncpull">Hämta från kalkylarket</button></div>
     <p class="muted" style="font-size:13px;margin:10px 0 0">Varje gång hon rapporterar något skickas huset till kalkylarket (en rad per hus och vecka). Utan täckning sparas det i telefonen och skickas när nätet är tillbaka. ”Hämta från kalkylarket” används på en ny telefon. Portkoder skickas aldrig.</p>
   </div></div>
-  <div class="section-title">Inställningar</div><div class="card"><div class="body" style="padding-top:4px">
+  <div class="section-title">Rutt och karta</div><div class="card static"><div class="body">
+    <label class="toggle"><input type="checkbox" data-act="smart" ${S.showAll?'':'checked'}> Smart rutt (hoppa över hus utan reklam)</label>
     <label class="lbl">Ort (för adressökning)</label><input type="text" data-city value="${esc(S.city)}">
     <div class="row"><button class="btn" data-act="regeo">Sök adresserna på kartan igen</button></div>
     <div class="row"><button class="btn" data-act="resetweek">Nollställ veckans bockar</button></div>
   </div></div>
-  <div class="section-title">Säkerhetskopia</div><div class="card"><div class="body" style="padding-top:14px">
-    <p class="muted" style="font-size:14px;margin:0 0 8px">Allt sparas i telefonens webbläsare. Kopiera en säkerhetskopia ibland och spara i Anteckningar.</p>
+  <div class="section-title">Säkerhetskopia</div><div class="card static"><div class="body">
+    <p class="muted" style="font-size:14px;margin:0 0 8px">Allt sparas i telefonens webbläsare${S.sync.url?' och i kalkylarket':''}. Kopiera en säkerhetskopia ibland och spara i Anteckningar.</p>
     <div class="row"><button class="btn" data-act="backup">Kopiera säkerhetskopia</button><button class="btn" data-act="restore">Återställ…</button></div>
     <div class="row"><button class="btn warn" data-act="wipe">Radera allt</button></div>
   </div></div>`;}
-function dock(it){const d=$('#dock');if(!it){d.classList.add('hidden');return;}d.classList.remove('hidden');
-  $('#dockAddr').textContent=it.address;
-  const c=[...it.codes.map(x=>missing(x)?'kod saknas':x.replace(/^(Grind|Port);\s*/,'$1 ')),...it.tags.map(x=>'tagg '+x)];
-  $('#dockMeta').textContent='ge ut '+want(it)+' ex'+(c.length?' · '+c.join(' · '):'');
-  $('#dockMap').textContent=tab==='map'?'Kort':'Karta';d.dataset.k=keyOf(it.address);}
-function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2000);}
-function modal(html){$('#sheet').innerHTML=html;$('#modal').classList.add('open');}
-function closeModal(){$('#modal').classList.remove('open');}
+function dock(it){const d=$('#dock');
+  if(!it){d.classList.add('hidden');document.body.classList.remove('has-dock');
+    if(S.route&&(tab==='map')&&active().length&&!active().some(i=>!status(i))){d.classList.remove('hidden');document.body.classList.add('has-dock');$('#dockInner').innerHTML=`<div class="what"><div class="addr">Klart för i dag! 🎉</div><div class="meta">Rapporten finns i menyn ☰</div></div><div class="dbtns"><button class="btn primary" data-go="report">Visa rapport</button></div>`;}
+    return;}
+  d.classList.remove('hidden');document.body.classList.add('has-dock');
+  const k=keyOf(it.address);
+  $('#dockInner').innerHTML=`<button class="what" data-act="house" data-k="${esc(k)}">
+      <div class="meta">Nästa · nr ${nrOf(it)} · ${wantLine(it)}</div>
+      <div class="addr">${esc(it.address)}</div>${chipsHTML(it)}</button>
+    <div class="dbtns"><button class="btn" data-act="house" data-k="${esc(k)}">Rapportera</button><button class="btn primary" data-act="done" data-k="${esc(k)}">Klar ✓</button></div>`;}
+
+// ---------- husbladet (öppnas över kartan) ----------
+function houseHTML(it){
+  const k=keyOf(it.address),h=hOf(it),st=status(it),v=h.vill??Math.min(1,it.hh);
+  return `<div class="grab"></div>
+    <div class="sheet-head"><div><div class="meta">nr ${nrOf(it)}</div><div class="addr big">${esc(it.address)}</div><div class="meta">${wantLine(it)}</div></div>
+      <button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
+    ${chipsHTML(it)}${flagsHTML(it)}
+    ${it.group?`<div class="note">${esc(it.group)}</div>`:''}
+    ${it.notes.length?`<div class="note plain">${esc(it.notes.join(' '))}</div>`:''}
+    <label class="lbl">Hur många av ${it.hh} hushåll vill ha reklam?</label>
+    <div class="stepper"><button data-act="v-" data-k="${esc(k)}" aria-label="Minska">−</button><output>${v}</output><button data-act="v+" data-k="${esc(k)}" aria-label="Öka">+</button>
+      <span class="muted" style="font-size:13px">${h.vill==null?'inte sparat än':''}</span></div>
+    <div class="opts"><button class="opt" aria-pressed="${h.vill===0}" data-act="v0" data-k="${esc(k)}">Ingen</button>${[1,2].filter(n=>n<it.hh).map(n=>`<button class="opt good" aria-pressed="${h.vill===n}" data-act="vn" data-n="${n}" data-k="${esc(k)}">${n}</button>`).join('')}<button class="opt good" aria-pressed="${h.vill===it.hh}" data-act="vall" data-k="${esc(k)}">Alla ${it.hh}</button></div>
+    <div class="row"><button class="btn primary big" data-act="done" data-k="${esc(k)}">${st==='klar'?'Ångra klar':'Klar ✓'}</button></div>
+    <div class="row"><button class="btn warn" data-act="noentry" data-k="${esc(k)}">Kom inte in</button><a class="btn" href="${mapsURL(it)}" target="_blank" rel="noopener">Vägbeskrivning</a></div>
+    <details class="more"${h.access||h.note||st==='ejin'?' open':''}><summary>Problem och anteckning</summary>
+      <div class="opts">${Object.entries(PROBLEMS).map(([p,t])=>`<button class="opt" aria-pressed="${h.access===p}" data-act="prob" data-p="${p}" data-k="${esc(k)}">${t}</button>`).join('')}
+        ${h.access?`<button class="opt good" aria-pressed="true" data-act="probclear" data-k="${esc(k)}">Fungerar nu</button>`:''}</div>
+      <label class="lbl">Anteckning (kommer med i rapporten)</label>
+      <textarea data-note="${esc(k)}" placeholder="t.ex. ny kod står på dörren, porten öppen till 16">${esc(h.note||'')}</textarea>
+      <div class="row"><button class="btn small" data-act="move" data-k="${esc(k)}">Flytta nålen på kartan</button></div>
+    </details>`;}
+function openHouse(k){sheetKey=k;const it=byKey(k);if(!it)return;$('#sheet').innerHTML=houseHTML(it);$('#sheet').scrollTop=0;$('#modal').classList.add('open');document.body.classList.add('noscroll');}
+function refreshSheet(){const it=byKey(sheetKey);if(!it){closeModal();return;}const sc=$('#sheet').scrollTop;const ta=document.activeElement&&document.activeElement.matches('[data-note]');if(ta)return;$('#sheet').innerHTML=houseHTML(it);$('#sheet').scrollTop=sc;}
+function menuHTML(){return `<div class="grab"></div><div class="sheet-head"><div class="addr big">Meny</div><button class="iconbtn" data-act="close" aria-label="Stäng">✕</button></div>
+  <label class="menuitem file"><span>📄</span><div><b>Läs in ny vecka</b><div class="muted">Välj adresslistan (PDF)</div></div><input type="file" accept="application/pdf,.pdf" data-file></label>
+  <button class="menuitem" data-go="report"><span>📋</span><div><b>Rapport till arbetsgivaren</b><div class="muted">Kodproblem och hur många som vill ha reklam</div></div></button>
+  <button class="menuitem" data-go="setup"><span>⚙︎</span><div><b>Inställningar</b><div class="muted">Kalkylark, smart rutt, säkerhetskopia</div></div></button>`;}
+
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2200);}
+function modal(html){sheetKey=null;$('#sheet').innerHTML=html;$('#modal').classList.add('open');document.body.classList.add('noscroll');}
+function closeModal(){sheetKey=null;$('#modal').classList.remove('open');document.body.classList.remove('noscroll');}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 
 // ======================= KARTA =======================
-let map=null,layer=null,line=null,me=null,meAcc=null,watchId=null,fitted=false,moveKey=null,lastMe=null;
+let map=null,layer=null,me=null,meAcc=null,watchId=null,fitted=false,moveKey=null,lastMe=null;
 function posOf(it){const h=hOf(it);if(h.pos)return h.pos;const g=S.geo[geoKey(it.address)];return g||null;}
 function geoKey(a){return keyOf(a)+'|'+keyOf(S.city);}
+function sizeMap(){const el=$('#map');if(!el)return;const top=el.getBoundingClientRect().top+scrollY;const dockH=document.body.classList.contains('has-dock')?$('#dock').offsetHeight:0;
+  el.style.height=Math.max(300,innerHeight-top-dockH-10)+'px';if(map)map.invalidateSize();}
+addEventListener('resize',()=>{if(tab==='map')sizeMap();});
 function ensureMap(){
   if(map)return true;
   if(!window.L){$('#mapBanner').textContent='Kartan kunde inte laddas – kontrollera internet.';$('#mapBanner').classList.remove('hidden');return false;}
@@ -397,24 +444,20 @@ function drawMap(){
     const sk=p[0].toFixed(5)+','+p[1].toFixed(5);const n=seen[sk]=(seen[sk]||0)+1;
     if(n>1){const a=(n-1)*1.9,r=0.00006;p=[p[0]+r*Math.cos(a),p[1]+r*Math.sin(a)*1.9];}
     const state=pinState(it,it===nx);
-    const icon=L.divIcon({className:'',html:`<div class="pin ${state}"><span>${state==='done'?'✓':i+1}</span></div>`,iconSize:state==='next'?[38,38]:[30,30],iconAnchor:state==='next'?[19,38]:[15,30],popupAnchor:[0,-30]});
+    const icon=L.divIcon({className:'',html:`<div class="pin ${state}"><span>${state==='done'?'✓':i+1}</span></div>`,iconSize:state==='next'?[38,38]:[30,30],iconAnchor:state==='next'?[19,38]:[15,30]});
     const mk=L.marker(p,{icon,zIndexOffset:state==='next'?1000:(state==='skip'||state==='done'?-100:0)}).addTo(layer);
-    mk.bindPopup(()=>popupHTML(it),{autoPanPadding:[20,80]});
+    mk.on('click',()=>{if(moveKey)return;openHouse(keyOf(it.address));});
     pts.push(p);
     if(!status(it)&&!skipReason(it))route.push(p);});
   if(nx&&posOf(nx)&&lastMe)route.unshift(lastMe);
-  if(route.length>1)L.polyline(route,{color:'#1f5f4a',weight:4,opacity:.75,dashArray:'6 8'}).addTo(layer);
+  if(route.length>1)L.polyline(route,{color:'#1f5f4a',weight:4,opacity:.75,dashArray:'6 8',interactive:false}).addTo(layer);
   if(!fitted&&pts.length){map.fitBounds(pts,{padding:[30,30]});fitted=true;}
   banner();}
-function popupHTML(it){const k=keyOf(it.address),st=status(it);
-  const c=[...it.codes.map(x=>missing(x)?'kod saknas':x.replace(/^(Grind|Port);\s*/,'$1 ')),...it.tags.map(x=>'tagg '+x)];
-  return `<div class="addr">${esc(it.address)}</div><div class="meta">${it.hh} hushåll · <b>ge ut ${want(it)} ex</b></div>${c.length?`<div style="margin-top:4px;font-family:ui-monospace,Menlo,monospace">${esc(c.join(' · '))}</div>`:''}
-  <div class="row"><button class="btn small ${st==='klar'?'':'primary'}" data-act="done" data-k="${esc(k)}">${st==='klar'?'Ångra':'Klar ✓'}</button><button class="btn small" data-act="showcard" data-k="${esc(k)}">Detaljer</button></div>
-  <div class="row"><a class="btn small" href="${mapsURL(it)}" target="_blank" rel="noopener">Vägbeskrivning</a><button class="btn small" data-act="move" data-k="${esc(k)}">Flytta nål</button></div>`;}
+function panToNext(){const n=nextItem();if(n&&map&&posOf(n))map.panTo(posOf(n),{animate:true});}
 function banner(){const b=$('#mapBanner');let t='';
   if(moveKey)t='Tryck på kartan där <b>'+esc(byKey(moveKey)?.address||'')+'</b> ligger. <a href="#" data-act="movecancel">Avbryt</a>';
   else if(geoBusy)t=`Hittar adresserna på kartan… ${geoBusy.done} av ${geoBusy.total}`;
-  else if(S.route){const miss=items().filter(i=>!posOf(i));if(miss.length)t=`${miss.length} ${miss.length===1?'adress':'adresser'} hittades inte. Tryck på dem i Rutt → <i>Visa på kartan</i> för att placera dem.`;}
+  else if(S.route){const miss=items().filter(i=>!posOf(i));if(miss.length)t=`${miss.length} ${miss.length===1?'adress':'adresser'} hittades inte. Öppna dem i Rutt → <i>Flytta nålen på kartan</i>.`;}
   b.innerHTML=t;b.classList.toggle('hidden',!t);}
 function startGPS(){
   if(!navigator.geolocation||watchId!==null)return;
@@ -427,6 +470,21 @@ function startGPS(){
 $('#btnMe').addEventListener('click',()=>{if(lastMe&&map)map.setView(lastMe,18);else{startGPS();toast('Söker din position…');}});
 $('#btnFit').addEventListener('click',()=>{if(!map)return;const pts=items().map(posOf).filter(Boolean);if(pts.length)map.fitBounds(pts,{padding:[30,30]});});
 
+function reportText(){
+  const m=S.route.meta||{},all=items(),act=active(),done=act.filter(i=>status(i)==='klar');
+  let t=`Rapport distrikt ${m.district||''}${m.period?', period '+m.period:''}\n${m.date||''}\n\nUtdelat: ${done.length} av ${act.length} adresser, ${done.reduce((s,i)=>s+want(i),0)} ex.\n`;
+  const probs=all.filter(i=>hOf(i).access||status(i)==='ejin'||(i.codes.some(missing)&&status(i)!=='klar'));
+  t+=`\nÅTKOMSTPROBLEM (${probs.length})\n`+(probs.length?'':'Inga.\n');
+  for(const i of probs){const h=hOf(i);const what=h.access?PROBLEMS[h.access]:(i.codes.some(missing)?'Kod saknas i listan':'Kom inte in');
+    const cur=[...i.codes.filter(c=>!missing(c)).map(c=>'kod '+c),...i.tags.map(x=>'tagg '+x)].join(', ');
+    t+=`- ${i.address}: ${what}${cur?' (i listan: '+cur+')':''}${h.note?'. '+h.note:''}\n`;}
+  const rep=all.filter(i=>hOf(i).vill!=null&&hOf(i).vill<i.hh);
+  const sumH=all.reduce((s,i)=>s+i.hh,0),sumW=all.reduce((s,i)=>s+want(i),0);
+  t+=`\nVILL HA REKLAM\nBehov: ${sumW} ex av ${sumH} hushåll i distriktet.\n`;
+  for(const i of rep)t+=`- ${i.address}: ${hOf(i).vill} av ${i.hh} vill ha${hOf(i).vill===0?' (ingen)':''}\n`;
+  const other=all.filter(i=>hOf(i).note&&!probs.includes(i));
+  if(other.length){t+=`\nÖVRIGT\n`;for(const i of other)t+=`- ${i.address}: ${hOf(i).note}\n`;}
+  return t;}
 // ---------- adressökning (OpenStreetMap Nominatim, max 1 fråga/sekund) ----------
 let geoBusy=null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -526,7 +584,7 @@ async function importPdf(file){
       if(h.hh!=null&&h.hh!==it.hh){h.hhChanged=true;hhN++;}
       h.snap=snap;h.hh=it.hh;if(h.zeroSince==null&&h.vill===0)h.zeroSince=S.week.no;}
     S.route={meta:r.meta,items:r.items,importedAt:Date.now()};
-    save();tab='route';open=null;fitted=false;render();
+    save();tab='map';closeModal();fitted=false;render();
     toast(`${r.items.length} adresser inlästa`+(codeN?` · ${codeN} med ny kod`:'')+(hhN?` · ${hhN} med ändrat antal hushåll`:''));
     geocodeAll(false);
   }catch(e){console.error(e);modal(`<h3 style="margin-top:0">Kunde inte läsa filen</h3><p class="muted">${esc(e.message||e)}</p><p class="muted">Kontrollera att det är adresslistan som PDF från utdelare.nu.</p><button class="btn block" data-act="close">Stäng</button>`);}
@@ -534,9 +592,9 @@ async function importPdf(file){
 
 // ======================= HÄNDELSER =======================
 const byKey=k=>items().find(i=>keyOf(i.address)===k);
-function rerenderKeep(){const y=scrollY;render();scrollTo(0,y);}
+function go(t){tab=t;closeModal();render();scrollTo(0,0);}
 document.addEventListener('change',e=>{
-  if(e.target.matches('[data-file]')&&e.target.files[0]){importPdf(e.target.files[0]);e.target.value='';}
+  if(e.target.matches('[data-file]')&&e.target.files[0]){closeModal();importPdf(e.target.files[0]);e.target.value='';}
   if(e.target.matches('[data-act=smart]')){S.showAll=!e.target.checked;save();render();}
   if(e.target.matches('[data-city]')){S.city=e.target.value.trim()||'Linköping';save();}
   if(e.target.matches('[data-syncurl]')){const u=e.target.value.trim();S.sync.url=u;save();syncUI();
@@ -544,35 +602,40 @@ document.addEventListener('change',e=>{
 });
 let noteT=null;
 document.addEventListener('input',e=>{if(e.target.matches('[data-note]')){const k=e.target.dataset.note;const h=S.houses[k]||(S.houses[k]={});h.note=e.target.value;clearTimeout(noteT);noteT=setTimeout(()=>touch(byKey(k)),600);}});
+document.addEventListener('focusout',e=>{if(e.target.matches&&e.target.matches('[data-note]')){clearTimeout(noteT);touch(byKey(e.target.dataset.note));}});
+function afterChange(){render();if(sheetKey)refreshSheet();}
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('[data-act],[data-tab]');if(!t||t.matches('input'))return;
-  if(t.dataset.tab){tab=t.dataset.tab;open=null;render();scrollTo(0,0);return;}
+  const t=e.target.closest('[data-act],[data-tab],[data-go]');if(!t||t.matches('input'))return;
+  if(t.dataset.tab){tab=t.dataset.tab;render();scrollTo(0,0);return;}
+  if(t.dataset.go){go(t.dataset.go);return;}
   const a=t.dataset.act,k=t.dataset.k,it=k&&byKey(k);
   if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();
   switch(a){
-    case 'open':open=open===k?null:k;rerenderKeep();break;
-    case 'done':if(status(it)==='klar')delete S.week.done[k];else markDone(it);open=null;touch(it);
-      if(map)map.closePopup();render();toast(status(it)==='klar'?'Klar ✓':'Ångrat');if(tab==='route')scrollNext();break;
-    case 'noentry':{S.week.done[k]='ejin';const h=H(it);if(!h.access)h.access=it.codes.some(missing)?'saknas':(it.tags.length&&!it.codes.length?'tagg':'kod');delete h.newCode;touch(it);open=k;rerenderKeep();toast('Markerat – välj vad som var fel');break;}
-    case 'v+':setVill(it,(hOf(it).vill??Math.min(1,it.hh))+1);touch(it);rerenderKeep();break;
-    case 'v-':setVill(it,(hOf(it).vill??Math.min(1,it.hh))-1);touch(it);rerenderKeep();break;
-    case 'vn':setVill(it,+t.dataset.n);touch(it);rerenderKeep();break;
-    case 'vall':setVill(it,it.hh);touch(it);rerenderKeep();break;
-    case 'v0':setVill(it,0);touch(it);rerenderKeep();break;
-    case 'prob':{const h=H(it);h.access=t.dataset.p;delete h.newCode;touch(it);rerenderKeep();break;}
-    case 'probclear':{const h=H(it);delete h.access;if(status(it)==='ejin')delete S.week.done[k];touch(it);rerenderKeep();break;}
+    case 'house':openHouse(k);break;
+    case 'done':{const was=status(it)==='klar';if(was)delete S.week.done[k];else{if(sheetKey===k&&hOf(it).vill==null)setVill(it,Math.min(1,it.hh));markDone(it);}touch(it);closeModal();render();
+      if(was){toast('Ångrat');break;}
+      const n=nextItem();toast(n?'Klar ✓  Nästa: '+n.address:'Klar ✓');
+      if(tab==='map')panToNext();else document.getElementById(n?idOf(keyOf(n.address)):'')?.scrollIntoView({behavior:'smooth',block:'center'});break;}
+    case 'noentry':{S.week.done[k]='ejin';const h=H(it);if(!h.access)h.access=it.codes.some(missing)?'saknas':(it.tags.length&&!it.codes.length?'tagg':'kod');delete h.newCode;touch(it);afterChange();
+      const d=$('#sheet details.more');if(d){d.open=true;d.scrollIntoView({block:'start',behavior:'smooth'});}toast('Markerat – välj vad som var fel');break;}
+    case 'v+':setVill(it,(hOf(it).vill??Math.min(1,it.hh))+1);touch(it);afterChange();break;
+    case 'v-':setVill(it,(hOf(it).vill??Math.min(1,it.hh))-1);touch(it);afterChange();break;
+    case 'vn':setVill(it,+t.dataset.n);touch(it);afterChange();break;
+    case 'vall':setVill(it,it.hh);touch(it);afterChange();break;
+    case 'v0':setVill(it,0);touch(it);afterChange();break;
+    case 'prob':{const h=H(it);h.access=t.dataset.p;delete h.newCode;touch(it);afterChange();break;}
+    case 'probclear':{const h=H(it);delete h.access;if(status(it)==='ejin')delete S.week.done[k];touch(it);afterChange();break;}
     case 'unskip':{const h=H(it);delete h.access;if(h.vill===0){h.zeroSince=S.week.no-CHECK_EVERY;}touch(it);render();toast('Tas med i rutten');break;}
-    case 'onmap':case 'move':tab='map';open=null;render();if(a==='move'||!posOf(it)){moveKey=k;if(map)map.closePopup();banner();if(!posOf(it))toast('Tryck på kartan där huset ligger');}
-      else{map&&map.setView(posOf(it),18);}break;
+    case 'move':closeModal();tab='map';render();moveKey=k;banner();toast('Tryck på kartan där huset ligger');break;
     case 'movecancel':moveKey=null;banner();break;
-    case 'showcard':tab='route';open=k;render();setTimeout(()=>document.getElementById(idOf(k))?.scrollIntoView({block:'start'}),30);break;
+    case 'menu':modal(menuHTML());break;
     case 'copy':try{await navigator.clipboard.writeText(reportText());toast('Rapporten är kopierad');}catch(_){selectReport();toast('Markera och kopiera texten');}break;
     case 'savefile':{const m=S.route.meta||{};const url=URL.createObjectURL(new Blob([reportText()],{type:'text/plain;charset=utf-8'}));const l=document.createElement('a');l.href=url;l.download=`rapport-${m.district||'distrikt'}-${m.period||''}.txt`;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);break;}
     case 'regeo':for(const key of Object.keys(S.geo))delete S.geo[key];S.geoDone=false;save();tab='map';render();geocodeAll(true);break;
     case 'resetweek':modal(`<h3 style="margin-top:0">Nollställ veckans bockar?</h3><p class="muted">Rapporterat antal som vill ha reklam och kodproblem sparas.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="doresetweek">Nollställ</button></div>`);break;
     case 'doresetweek':S.week.done={};save();closeModal();render();toast('Nollställt');break;
-    case 'wipe':modal(`<h3 style="margin-top:0">Radera allt?</h3><p class="muted">Listan och allt hon rapporterat tas bort. Det går inte att ångra.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn warn" data-act="dowipe">Radera</button></div>`);break;
-    case 'dowipe':{const c=S.city;S=blank();S.city=c;save();closeModal();tab='route';render();break;}
+    case 'wipe':modal(`<h3 style="margin-top:0">Radera allt?</h3><p class="muted">Listan och allt hon rapporterat i telefonen tas bort. Det går inte att ångra.</p><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn warn" data-act="dowipe">Radera</button></div>`);break;
+    case 'dowipe':{const c=S.city,sy=S.sync.url;S=blank();S.city=c;S.sync.url=sy;save();closeModal();tab='map';render();break;}
     case 'backup':try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Säkerhetskopia kopierad');}catch(_){modal(`<h3 style="margin-top:0">Säkerhetskopia</h3><textarea readonly style="min-height:160px">${esc(JSON.stringify(S))}</textarea><div class="row"><button class="btn" data-act="close">Stäng</button></div>`);}break;
     case 'restore':modal(`<h3 style="margin-top:0">Återställ säkerhetskopia</h3><textarea id="restoreTxt" style="min-height:140px" placeholder="Klistra in här"></textarea><div class="row"><button class="btn" data-act="close">Avbryt</button><button class="btn primary" data-act="dorestore">Återställ</button></div>`);break;
     case 'dorestore':try{const o=JSON.parse($('#restoreTxt').value);if(!o||typeof o!=='object'||!('houses' in o))throw 0;S=Object.assign(blank(),o);save();closeModal();fitted=false;render();toast('Återställt');}catch(_){toast('Ogiltig säkerhetskopia');}break;
@@ -582,9 +645,6 @@ document.addEventListener('click',async e=>{
     case 'close':closeModal();break;
   }
 });
-$('#dockDone').addEventListener('click',()=>{const it=byKey($('#dock').dataset.k);if(!it)return;markDone(it);touch(it);if(map)map.closePopup();render();toast('Klar ✓');if(tab==='route')scrollNext();});
-$('#dockMap').addEventListener('click',()=>{const k=$('#dock').dataset.k,it=byKey(k);if(tab==='map'){tab='route';open=k;render();setTimeout(()=>document.getElementById(idOf(k))?.scrollIntoView({block:'start'}),30);}else{tab='map';render();if(it&&posOf(it)&&map)map.setView(posOf(it),18);}});
-function scrollNext(){const n=nextItem();if(!n)return;document.getElementById(idOf(keyOf(n.address)))?.scrollIntoView({behavior:'smooth',block:'center'});}
 function selectReport(){const el=$('#reportText');if(!el)return;const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);}
 
 load();
